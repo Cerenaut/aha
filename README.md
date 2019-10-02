@@ -1,10 +1,11 @@
-# memory
-Selective memory system based on convolutional, capsular/modular hierarchical k-sparse autoencoders
+# Artificial Hippocampus Algorithm
+The codebase for the Artificial Hippocampus Algorithm (AHA) project.
+
+## Dependencies
+- [PAGI Framework](https://github.com/ProjectAGI/pagi) >= 0.1
+
+## Getting Started
+Ensure that you have `pagi` installed and that its accessible via the command-line by running `pagi --help`. Clone this
+repository and install the package using `pip install -e .`
 
 
-## Testing
-Unit tests can be executed in multiple ways:
-
-1. Execute an individual test: `python -m components.autoencoder_component_test`
-2. Execute all tests in a specific directory: `python -m unittest discover -s ./components -p '*_test.py'`
-3. Execute all the tests in the project: `python -m unittest discover -p '*_test.py'`
