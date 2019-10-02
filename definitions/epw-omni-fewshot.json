@@ -4,13 +4,13 @@
     "dataset": "aha.datasets.omniglot_lake_runs_dataset",
     "component": "aha.components.episodic_component",
 
-    "checkpoint": "../ckpts/summaries_20190516-110659/model.ckpt-2000",
+    "checkpoint": "/home/incubator/agief-remote-run/storage/checkpoints/episodic/summaries_20190516-110659/model.ckpt-2000",
     "checkpoint_load_scope": "episodic/vc",
     "checkpoint_frozen_scope": "episodic/vc, episodic/dg",
 
     "logging": "info",
     "seed": 42,
-    "batches": 40,
+    "batches": 800,
 
     "summarize": true,
     "track": true,
@@ -96,7 +96,8 @@
       "pc_hl_pm_l1_size": 100,
       "pc_hl_pm_raw_l1_size": 100,
       "pc_hl_pm_raw_l2_regularizer": 0.00004,
-
+      "pc_hl_pm_raw_nonlinearity": "leaky_relu",
+      "pc_hl_pm_noise_type": "s",
       "pc_hl_pm_train_with_noise": 0.0,
       "pc_hl_pm_train_with_noise_pp": 0.0,
 
@@ -199,7 +200,7 @@
        "num_repeats": 40,
        "noise_factor": 0.2,
        "degrade_factor": 0.2,
-        "recurse_iterations": 70,
+       "recurse_iterations": 70,
        "evaluate_mode": ["oneshot"]
      },
      {
