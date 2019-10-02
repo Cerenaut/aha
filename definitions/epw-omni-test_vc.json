@@ -1,0 +1,68 @@
+{
+  "experiment-options": {
+    "workflow": "aha.workflows.episodic_few_shot_workflow",
+    "dataset": "datasets.omniglot_dataset",
+    "component": "aha.components.episodic_component",
+
+    "checkpoint": "/Users/gideon/agief-remote-run/storage/checkpoints/episodic/omni_16_1_300/model.ckpt-300",
+    "checkpoint_load_scope": "episodic/vc",
+    "checkpoint_frozen_scope": "episodic/vc",
+
+    "logging": "info",
+    "seed": 4,
+    "batches": 1,
+
+    "summarize": true,
+    "track": true,
+    "tb_debug": false,
+
+    "hparams_override": {
+      "batch_size": 320,
+      "pc_type": "none",
+      "dg_type": "none",
+      "max_outputs": 3,
+      "summarize_level": 0,
+
+      "vc_num_layers": 1,
+      "vc_batch_size": [320],
+      "vc_learning_rate": [0.001],
+      "vc_sparsity": [3],
+      "vc_sparsity_output_factor": [1.0],
+      "vc_filters": [64],
+      "vc_filters_field_width": [16],
+      "vc_filters_field_height": [16],
+      "vc_filters_field_stride": [1],
+      "vc_pool_size": [1],
+      "vc_pool_strides": [1],
+      "vc_use_unpooling": ["fixed"],
+      "vc_use_max_pool": ["none"],
+      "vc_secondary": [true],
+      "vc_nonlinearity": ["none"],
+      "vc_summarize_level": [0],
+      "vc_max_outputs": [3]
+    }
+  },
+  "export-options": {
+    "export_filters": false
+  },
+  "workflow-options": {
+    "num_repeats": 1,
+    "evaluate": true,
+    "train": true,
+    "invert_images": true,
+    "resize_images_factor": 1.0,
+    "superclass": true,
+    "class_proportion": 1.0,
+    "train_classes": [],
+    "test_classes": [],
+    "degrade_type": "none",
+    "degrade_step": "none",
+    "train_recurse": false,
+    "test_recurse": false,
+    "visualise_vc": false,
+    "visualise_dg_at_vc": false,
+    "visualise_pc_at_dg": false,
+    "visualise_pc_at_vc": false,
+    "evaluate_mode": "test_vc"
+  }
+}

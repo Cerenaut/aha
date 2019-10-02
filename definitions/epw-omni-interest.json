@@ -1,0 +1,90 @@
+{
+  "experiment-options": {
+    "workflow": "aha.workflows.episodic_few_shot_workflow",
+    "dataset": "datasets.omniglot_lake_runs_dataset",
+    "component": "aha.components.episodic_component",
+
+    "checkpoint": "/home/dave/dev/amtl/ckpt2k/model.ckpt-2000",
+    "checkpoint_load_scope": "episodic/vc",
+    "checkpoint_frozen_scope": "episodic/vc",
+
+    "logging": "info",
+    "seed": 5,
+    "batches": 20,
+
+    "summarize": true,
+    "track": true,
+    "tb_debug": false,
+
+    "hparams_override": {
+      "batch_size": 20,
+      "output_features": "vc",
+      "pc_type": "none",
+      "dg_type": "none",
+      "use_cue_to_pc": true,
+      "use_interest_filter": true,
+      "vc_norm_per_filter": false,
+      "vc_norm_per_sample": true,
+      "max_pool_vc_final_size": 4,
+      "max_pool_vc_final_stride": 4,
+      "summarize_level": 0,
+      "max_outputs": 15,
+
+      "vc_num_layers": 1,
+      "vc_batch_size": [20],
+      "vc_learning_rate": [0.001],
+      "vc_sparsity": [4],
+      "vc_sparsity_output_factor": [1.0],
+      "vc_filters": [121],
+      "vc_filters_field_width": [10],
+      "vc_filters_field_height": [10],
+      "vc_filters_field_stride": [1],
+      "vc_pool_size": [1],
+      "vc_pool_strides": [1],
+      "vc_use_unpooling": ["fixed"],
+      "vc_use_max_pool": ["none"],
+      "vc_secondary": [true],
+      "vc_nonlinearity": ["none"],
+      "vc_summarize_level": [0],
+      "vc_max_outputs": [15],
+
+      "ifi_batch_size": 20,
+      "ifi_num_features": 15,
+      "ifi_scale_range": [1.0],
+      "ifi_pe_size": 15,
+      "ifi_pe_std": 2.375,
+      "ifi_nms_size": 5,
+      "ifi_nms_stride": 1,
+      "ifi_f_size": 7,
+      "ifi_f_std": 1,
+      "ifi_f_k": 1.6,
+      "ifi_summarize_level": 0,
+      "ifi_max_outputs": 15
+    }
+  },
+  "export-options": {
+    "export_filters": false
+  },
+  "workflow-options": {
+    "num_repeats": 1,
+    "evaluate": true,
+    "invert_images": false,
+    "resize_images_factor": 0.5,
+    "superclass": true,
+    "class_proportion": 1.0,
+    "train_classes": [],
+    "test_classes": [],
+    "batch_all_classes": false,
+    "batch_no_duplicates": false,
+    "degrade_type": "none",
+    "degrade_step": "none",
+    "train_recurse": false,
+    "test_recurse": false,
+    "recurse_iterations": 1,
+    "rsummary_batches": 1,
+    "visualise_vc": false,
+    "visualise_if_at_vc": true,
+    "evaluate_mode": ["test_vc", "test_if"],
+    "summarize_completion": "to_file"
+  }
+}

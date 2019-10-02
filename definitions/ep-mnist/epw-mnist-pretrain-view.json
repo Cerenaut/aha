@@ -1,0 +1,103 @@
+{
+  "experiment-options": {
+    "workflow": "aha.workflows.episodic_few_shot_workflow",
+    "dataset": "datasets.mnist_dataset",
+    "component": "aha.components.episodic_component",
+
+    "checkpoint": "/Users/gideon/Dev/storage/checkpoints/fs/20190309_mnist_dg_tanh/model.ckpt-15000",
+    "checkpoint_load_scope": "episodic/vc, episodic/dg",
+    "checkpoint_frozen_scope": "episodic/vc, episodic/dg",
+
+    "logging": "info",
+    "seed": 4,
+    "batches": 1,
+
+    "summarize": true,
+    "track": true,
+    "tb_debug": false,
+
+    "hparams_override": {
+      "batch_size": 500,
+      "output_features": "dg",
+      "pc_type": "none",
+      "dg_type": "none",
+      "use_cue_to_pc": true,
+      "max_outputs": 10,
+
+      "vc_num_layers": 2,
+      "vc_batch_size": [500, 500],
+      "vc_learning_rate": [0.001, 0.001],
+      "vc_sparsity": [7, 10],
+      "vc_sparsity_output_factor": [1.0, 1.0],
+      "vc_filters": [64, 100],
+      "vc_filters_field_width": [6, 2],
+      "vc_filters_field_height": [6, 2],
+      "vc_filters_field_stride": [3, 1],
+      "vc_pool_size": [1, 1],
+      "vc_pool_strides": [1, 1],
+      "vc_use_unpooling": ["fixed", "fixed"],
+      "vc_use_max_pool": ["training", "training"],
+      "vc_secondary": [true, true],
+      "vc_nonlinearity": ["relu", "relu"],
+      "vc_max_outputs": [10, 10],
+
+      "dg_conv_batch_size": 500,
+      "dg_conv_learning_rate": 0.001,
+      "dg_conv_sparsity": 8,
+      "dg_conv_sparsity_output_factor": 1.0,
+      "dg_conv_filters": 784,
+      "dg_conv_filters_field_width": 10,
+      "dg_conv_filters_field_height": 10,
+      "dg_conv_filters_field_stride": 10,
+      "dg_conv_secondary": false,
+      "dg_conv_nonlinearity": "relu",
+
+      "dg_dense_batch_size": 500,
+      "dg_dense_learning_rate": 0.001,
+      "dg_dense_sparsity": 25,
+      "dg_dense_sparsity_output_factor": 1.0,
+      "dg_dense_filters": 1500,
+      "dg_dense_secondary": true,
+      "dg_dense_nonlinearity": "tanh",
+      "dg_dense_max_outputs": 10,
+
+      "pc_hl_batch_size": 500,
+      "pc_hl_use_feedback": true,
+      "pc_hl_memorise_method": "pinv",
+      "pc_hl_nonlinearity": "tanh",
+      "pc_hl_update_n_neurons": 10,
+      "pc_hl_max_outputs": 10
+    }
+  },
+  "export-options": {
+    "export_filters": false
+  },
+  "workflow-options": {
+    "num_repeats": 1,
+    "evaluate": true,
+    "train": true,
+    "invert_images": false,
+    "superclass": false,
+    "class_proportion": 1.0,
+    "train_classes": ["1","2","3","4","5","6","7","8","9"],
+    "test_classes": ["1","2","3","4","5","6","7","8","9"],
+    "degrade_type": "none",
+    "degrade_step": "none",
+    "train_recurse": false,
+    "test_recurse": false,
+    "recurse_iterations": 100,
+    "rsummary_batches": 1,
+    "visualise_vc": true,
+    "visualise_dg_at_vc": false,
+    "visualise_pc_at_dg": false,
+    "visualise_pc_at_vc": false,
+    "evaluate_mode": "create_data_subset",
+    "input_mode":
+     {
+       "train_first": "complete",
+       "train_inference": "complete",
+       "test_first": "absent",
+       "test_inference": "absent"
+     }
+  }
+}

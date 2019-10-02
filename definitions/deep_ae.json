@@ -1,0 +1,28 @@
+{
+  "experiment-options": {
+    "workflow": "pagi.workflows.workflow",
+    "dataset": "pagi.datasets.mnist_dataset",
+    "component": "aha.components.deep_autoencoder_component",
+
+    "logging": "info",
+
+    "seed": 42,
+    "batches": 10000,
+
+    "summarize": true,
+    "track": false,
+
+    "hparams_override": {
+      "num_layers": 3,
+      "batch_size": 64,
+      "learning_rate": 0.005,
+      "filters": [512, 256, 128],
+      "nonlinearity": ["relu", "relu", "relu"]
+    }
+  },
+  "workflow-options": {
+    "evaluate": false,
+    "train_classes": ["0","1","2","3","4","5","6","7","8","9"],
+    "test_classes": ["0","1","2","3","4","5","6","7","8","9"]
+  }
+}

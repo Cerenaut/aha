@@ -1,0 +1,80 @@
+{
+  "experiment-options": {
+    "workflow": "aha.workflows.episodic_few_shot_workflow",
+    "dataset": "datasets.omniglot_dataset",
+    "component": "aha.components.episodic_component",
+
+    "logging": "info",
+    "seed": 5,
+    "batches": 1,
+
+    "summarize": true,
+    "track": true,
+    "tb_debug": false,
+
+    "hparams_override": {
+      "batch_size": 3,
+      "output_features": "vc",
+      "pc_type": "none",
+      "dg_type": "none",
+      "use_cue_to_pc": true,
+      "use_interest_filter": true,
+      "visualise_interest_filter_encodings": true,
+      "summarize_level": 0,
+      "max_outputs": 3,
+
+      "vc_num_layers": 1,
+      "vc_batch_size": [3],
+      "vc_learning_rate": [0.001],
+      "vc_sparsity": [7],
+      "vc_sparsity_output_factor": [1.0],
+      "vc_filters": [64],
+      "vc_filters_field_width": [20],
+      "vc_filters_field_height": [20],
+      "vc_filters_field_stride": [1],
+      "vc_pool_size": [1],
+      "vc_pool_strides": [1],
+      "vc_use_unpooling": ["fixed"],
+      "vc_use_max_pool": ["none"],
+      "vc_secondary": [true],
+      "vc_nonlinearity": ["none"],
+      "vc_summarize_level": [0],
+      "vc_max_outputs": [3],
+
+      "ifi_batch_size": 3,
+      "ifi_num_features": 10,
+      "ifi_scale_range": [1.0],
+      "ifi_pe_size": 20,
+      "ifi_pe_std": 3.0,
+      "ifi_nms_size": 5,
+      "ifi_nms_stride": 1,
+      "ifi_f_size": 20,
+      "ifi_f_std": 3,
+      "ifi_f_k": 1.6,
+      "ifi_max_outputs": 3
+    }
+  },
+  "export-options": {
+    "export_filters": false
+  },
+  "workflow-options": {
+    "num_repeats": 1,
+    "evaluate": true,
+    "invert_images": true,
+    "superclass": true,
+    "class_proportion": 1.0,
+    "train_classes": [],
+    "test_classes": [],
+    "degrade_type": "none",
+    "degrade_step": "none",
+    "train_recurse": false,
+    "test_recurse": false,
+    "recurse_iterations": 1,
+    "rsummary_batches": 1,
+    "visualise_vc": true,
+    "visualise_dg_at_vc": false,
+    "visualise_pc_at_dg": false,
+    "visualise_pc_at_vc": false,
+    "evaluate_mode": "oneshot"
+  }
+}

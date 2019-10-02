@@ -1,0 +1,77 @@
+{
+  "experiment-options": {
+    "workflow": "aha.workflows.episodic_few_shot_workflow",
+    "dataset": "datasets.omniglot_dataset",
+    "component": "aha.components.episodic_component",
+
+    "logging": "info",
+    "seed": 4,
+    "batches": 2000,
+
+    "summarize": true,
+    "track": true,
+    "tb_debug": false,
+
+    "hparams_override": {
+      "batch_size": 128,
+      "pc_type": "none",
+      "dg_type": "none",
+      "max_outputs": 3,
+      "summarize_level": 0,
+
+      "vc_num_layers": 1,
+      "vc_batch_size": [128],
+      "vc_learning_rate": [0.001],
+      "vc_sparsity": [1],
+      "vc_sparsity_output_factor": [1.0],
+      "vc_filters": [121],
+      "vc_filters_field_width": [10],
+      "vc_filters_field_height": [10],
+      "vc_filters_field_stride": [5],
+      "vc_pool_size": [1],
+      "vc_pool_strides": [1],
+      "vc_use_unpooling": ["fixed"],
+      "vc_use_max_pool": ["none"],
+      "vc_secondary": [true],
+      "vc_nonlinearity": ["none"],
+      "vc_summarize_level": [1],
+      "vc_max_outputs": [3]
+    }
+  },
+  "export-options": {
+    "export_filters": true
+  },
+  "workflow-options": {
+    "num_repeats": 1,
+    "superclass": true,
+    "class_proportion": 1.0,
+    "invert_images": true,
+    "resize_images_factor": 0.5,
+    "min_val": 0,
+    "train_classes": [],
+    "test_classes": [],
+    "batch_all_classes": false,
+    "batch_no_duplicates": false,
+    "degrade_type": "none",
+    "degrade_step": "none",
+    "completion_gain": 1.0,
+    "train_recurse": false,
+    "test_recurse": false,
+    "recurse_iterations": 0,
+    "rsummary_batches": 2,
+    "input_mode": {
+        "train_first": "complete",
+        "train_inference": "complete",
+        "test_first": "complete",
+        "test_inference": "complete"
+    },
+    "evaluate": false,
+    "train": true,
+    "visualise_vc": false,
+    "visualise_dg_at_vc": false,
+    "visualise_pc_at_dg": false,
+    "visualise_pc_at_vc": false,
+    "evaluate_mode": "simple",
+    "evaluate_supermode": "none"
+  }
+}

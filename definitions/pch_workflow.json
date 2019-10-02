@@ -1,0 +1,53 @@
+{
+  "experiment-options": {
+    "workflow": "aha.workflows.pattern_completion_workflow",
+    "dataset": "datasets.artificial_dataset",
+    "component": "aha.components.hopfieldlike_component",
+
+    "logging": "info",
+
+    "seed": 41,
+    "batches": 1,
+
+    "evaluate": true,
+    "summarize": true, 
+    "track": true,
+
+    "hparams_override": {
+      "batch_size": 10,
+      "use_feedback": true,
+      "memorise_method": "pinv",
+      "nonlinearity": "tanh",
+      "update_n_neurons": 300,
+      "max_outputs": 2
+    }
+  },
+  "export-options": {
+    "export_filters": false
+  },
+  "workflow-options": {
+      "num_repeats": 1,
+      "train_classes": ["0","1","2","3","4","5","6","7","8","9"],
+      "test_classes": ["0","1","2","3","4","5","6","7","8","9"],
+      "min_val": -1,
+      "train_recurse": false,
+      "test_recurse": true,
+      "recurse_iterations": 50,
+      "rsummary_batches": 1,
+      "degrade_type": "none",
+      "degrade_factor": 0.2,
+      "noise_val": 0.0,
+      "noise_factor": 0.2,
+      "input_mode":
+       {
+         "train_first": "complete",
+         "train_inference": "complete",
+         "test_first": "complete",
+         "test_inference": "complete"
+       }
+  },
+  "parameter-sweeps": {
+    "hparams": [],
+    "workflow-options": []
+  }
+}

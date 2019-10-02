@@ -1,0 +1,92 @@
+{
+  "experiment-options": {
+    "workflow": "aha.workflows.episodic_pattern_completion_workflow",
+    "dataset": "datasets.mnist_dataset",
+    "component": "aha.components.episodic_component",
+
+    "checkpoint": "/Users/Abdel/Developer/code/ProjectAGI/memory/run/1vc-dense_dg-pretrain/model.ckpt-1000",
+    "checkpoint_load_scope": "episodic/vc, episodic/dg",
+    "checkpoint_frozen_scope": "episodic/vc, episodic/dg",
+
+
+
+    "logging": "info",
+    "seed": 42,
+    "batches": 10,
+
+    "summarize": true,
+    "track": true,
+
+    "hparams_override": {
+      "batch_size": 3,
+      "output_features": "vc",
+      "pc_type": "hl",
+      "dg_type": "dense",
+
+      "vc_num_layers": 1,
+      "vc_batch_size": [3],
+      "vc_learning_rate": [0.001],
+      "vc_sparsity": [6],
+      "vc_sparsity_output_factor": [1.0],
+      "vc_filters": [64],
+      "vc_filters_field_width": [6],
+      "vc_filters_field_height": [6],
+      "vc_filters_field_stride": [3],
+      "vc_pool_size": [2],
+      "vc_pool_strides": [2],
+      "vc_use_unpooling": ["fixed"],
+      "vc_use_max_pool": ["none"],
+      "vc_secondary": [true],
+      "vc_nonlinearity": ["relu"],
+
+      "dg_conv_batch_size": 3,
+      "dg_conv_learning_rate": 0.001,
+      "dg_conv_sparsity": 8,
+      "dg_conv_sparsity_output_factor": 1.0,
+      "dg_conv_filters": 784,
+      "dg_conv_filters_field_width": 10,
+      "dg_conv_filters_field_height": 10,
+      "dg_conv_filters_field_stride": 10,
+      "dg_conv_secondary": true,
+      "dg_conv_nonlinearity": "relu",
+
+      "dg_dense_batch_size": 3,
+      "dg_dense_learning_rate": 0.001,
+      "dg_dense_sparsity": 8,
+      "dg_dense_sparsity_output_factor": 1.0,
+      "dg_dense_filters": 784,
+      "dg_dense_secondary": true,
+      "dg_dense_nonlinearity": "tanh",
+
+      "pc_hl_batch_size": 3,
+      "pc_hl_use_feedback": true,
+      "pc_hl_memorise_method": "pinv",
+      "pc_hl_nonlinearity": "relu"
+    }
+  },
+  "export-options": {
+    "export_filters": true
+  },
+  "workflow-options": {
+    "num_repeats": 1,
+    "evaluate": true,
+    "train_classes": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+    "test_classes": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+    "recurse_iterations": 5,
+    "visualise_vc": true,
+    "visualise_dg_at_vc": true,
+    "visualise_pc_at_dg": true,
+    "visualise_pc_at_vc": true,
+    "rsummary_batches": 2,
+    "degrade_step": "none",
+    "degrade_type": "horizontal",
+    "input_mode":
+     {
+       "train_first": "complete",
+       "train_inference": "complete",
+       "test_first": "complete",
+       "test_inference": "absent"
+     },
+     "completion_test": "expA_isolate_view"
+  }
+}
