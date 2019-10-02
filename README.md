@@ -8,4 +8,7 @@ The codebase for the Artificial Hippocampus Algorithm (AHA) project.
 Ensure that you have `pagi` installed and that its accessible via the command-line by running `pagi --help`. Clone this
 repository and install the package using `pip install -e .`
 
+### Running Experiments
+You can run experiments using any of the existing definition files, or your own definition file, using the following command:
 
+`pagi run --experiment_def=definitions/FILENAME.json`
