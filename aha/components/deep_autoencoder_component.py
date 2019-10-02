@@ -55,6 +55,8 @@ class DeepAutoencoderComponent(AutoencoderComponent):
         pm_l1_size=100,               # hidden layer of PM path (pattern mapping)
         pm_raw_l1_size=100,
         pm_raw_l2_regularizer=0.0,
+        pm_raw_nonlinearity='leaky_relu',
+        pm_noise_type='s',            # 's' for salt, 'sp' for salt + pepper
         pm_train_with_noise=0.0,
         pm_train_with_noise_pp=0.0,
 
@@ -252,49 +254,70 @@ class DeepAutoencoderComponent(AutoencoderComponent):
     self._build_optimizer(loss, 'training')
 
   def _build_pm(self):
+    """Preprocess the inputs and build the pattern mapping components."""
+
     # map to input
     x_nn = self._dual.get_op('output')  # output of Deep AE
     x_nn = tf.layers.flatten(x_nn)
 
-    # apply noise at train and/or test time, to regularise / test generalisation
-    # x_nn = tf.cond(tf.equal(self._batch_type, 'encoding'),
-    #                lambda: image_utils.add_image_salt_noise_flat(x_nn, None,
-    #                                                              noise_val=self._hparams.pm_test_with_noise,
-    #                                                              noise_factor=self._hparams.pm_test_with_noise_pp,
-    #                                                              mode='replace'),
-    #                lambda: x_nn)
-    x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
-                   lambda: image_utils.add_image_salt_noise_flat(x_nn, None,
-                                                                 noise_val=self._hparams.pm_train_with_noise,
-                                                                 noise_factor=self._hparams.pm_train_with_noise_pp,
-                                                                 mode='replace'),
-                   lambda: x_nn)
+    # Apply noise during training, to regularise / test generalisation
+    # --------------------------------------------------------------------------
+    if self._hparams.pm_noise_type == 's':  # salt noise
+      x_nn = tf.cond(
+          tf.equal(self._batch_type, 'training'),
+          lambda: image_utils.add_image_salt_noise_flat(x_nn, None,
+                                                        noise_val=self._hparams.pm_train_with_noise,
+                                                        noise_factor=self._hparams.pm_train_with_noise_pp,
+                                                        mode='replace'),
+          lambda: x_nn
+      )
 
-    # Inspired by denoising AE.
-    # Add salt+pepper noise to mimic missing/extra bits in PC space.
-    # Use a fairly high rate of noising to mitigate few training iters.
-    # x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
-    #                lambda: image_utils.add_image_salt_pepper_noise_flat(x_nn, None,
-    #                                                              salt_val=self._hparams.pm_train_with_noise,
-    #                                                              pepper_val=-self._hparams.pm_train_with_noise,
-    #                                                              noise_factor=self._hparams.pm_train_with_noise_pp),
-    #                lambda: x_nn)
+    elif self._hparams.pm_noise_type == 'sp':  # salt + pepper noise
+      # Inspired by denoising AE.
+      # Add salt+pepper noise to mimic missing/extra bits in PC space.
+      # Use a fairly high rate of noising to mitigate few training iters.
+      x_nn = tf.cond(
+          tf.equal(self._batch_type, 'training'),
+          lambda: image_utils.add_image_salt_pepper_noise_flat(x_nn, None,
+                                                               salt_val=self._hparams.pm_train_with_noise,
+                                                               pepper_val=-self._hparams.pm_train_with_noise,
+                                                               noise_factor=self._hparams.pm_train_with_noise_pp),
+          lambda: x_nn
+      )
+
+    else:
+      raise NotImplementedError('PM noise type not supported: ' + str(self._hparams.noise_type))
+
+    # Build PM
+    # --------------------------------------------------------------------------
+    if self.use_pm:
+      ec_in = self._input_cue
+      output_nonlinearity = type_activation_fn('leaky_relu')
+      ec_out = self._build_pm_core(x=x_nn, target=ec_in,
+                                   l1_size=self._hparams.pm_l1_size,
+                                   non_linearity1=tf.nn.leaky_relu,
+                                   non_linearity2=output_nonlinearity,
+                                   loss_fn=tf.losses.mean_squared_error)
+      self._dual.set_op('ec_out', ec_out)
 
     if self._use_pm_raw:
       ec_in = self._input_cue_raw
+      output_nonlinearity = type_activation_fn(self._hparams.pm_raw_nonlinearity)
       ec_out_raw = self._build_pm_core(x=x_nn, target=ec_in,
                                        l1_size=self._hparams.pm_raw_l1_size,
                                        non_linearity1=tf.nn.leaky_relu,
-                                       non_linearity2=tf.nn.leaky_relu,  # Squash influence of additional (erroneous) px
+                                       non_linearity2=output_nonlinearity,
                                        loss_fn=tf.losses.mean_squared_error,
                                        name_suffix="_raw")
       self._dual.set_op('ec_out_raw', ec_out_raw)
 
+
   def _build_pm_core(self, x, target, l1_size, non_linearity1, non_linearity2, loss_fn, name_suffix=""):
+    """Build the layers of the PM network, with optional L2 regularization."""
     target_shape = target.get_shape().as_list()
     target_size = np.prod(target_shape[1:])
     l2_size = target_size
-    print(x)
+
     weights = []
     with tf.variable_scope('pm' + name_suffix):
       y1_layer = tf.layers.Dense(units=l1_size, activation=non_linearity1)
@@ -323,7 +346,7 @@ class DeepAutoencoderComponent(AutoencoderComponent):
         weight_loss_scaled = weight_loss_sum * self._hparams.pm_raw_l2_regularizer
         all_losses.append(weight_loss_scaled)
 
-      all_losses_op = tf.add_n(all_losses)
+      all_losses_op = tf.add_n(all_losses, name='total_pm_loss')
       self._build_optimizer(all_losses_op, 'training_pm' + name_suffix)
     else:
       self._build_optimizer(loss, 'training_pm' + name_suffix)

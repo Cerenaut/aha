@@ -745,25 +745,30 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     They are collected during training and testing.
     """
     images_names = [
-      'vc_input_training',
-      # 'vc_training',
-      # 'pc_in_training',
-      'vc_input_encoding',
-      # 'vc_encoding',      # not very informative
-      # 'pc_in_encoding',
-      # 'pc_encoding',
-      'pc_at_vc'      # available when not using interest filter
+        'vc_input_training',
+        # 'vc_training',
+        'pc_in_training',
+        'vc_input_encoding',
+        # 'vc_encoding',      # not very informative
+        'pc_in_encoding',
+        'pc_encoding',
+        'pc_at_vc'      # available when not using interest filter
     ]
+
+    if self._hparams.pc_type != 'hl':
+      images_names.remove('pc_in_training')
+      images_names.remove('pc_in_encoding')
+      images_names.remove('pc_encoding')
 
     if self._hparams.use_pm:
       images_names += ['ec_out_raw']
 
     if self._add_comparison_images:
       images_names += [
-        'vc_ovlap',
-        'pc_in_mse',
-        'pc_in_tf_mse',
-        'pc_out_mse'
+          'vc_ovlap',
+          'pc_in_mse',
+          'pc_in_tf_mse',
+          'pc_out_mse'
       ]
 
     summary_images = []
