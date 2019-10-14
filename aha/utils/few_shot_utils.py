@@ -435,7 +435,7 @@ def compute_matching(modes, train_features, test_features, comparison_type='mse'
       accuracy = correct / max_correct
     return accuracy, sum_ambiguous_
 
-  if 'onshot' in modes:
+  if 'oneshot' in modes:
     truth_matrix = compute_truth_matrix_oneshot()
   else:
     truth_matrix = compute_truth_matrix_instance()
