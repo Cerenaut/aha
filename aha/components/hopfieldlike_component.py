@@ -671,7 +671,8 @@ class HopfieldlikeComponent(Component):
     l2_size = target_size
 
     weights = []
-    with tf.variable_scope('pm' + name_suffix):
+    scope = 'pm' + name_suffix
+    with tf.variable_scope(scope):
       y1_layer = tf.layers.Dense(units=l1_size, activation=non_linearity1)
       y1 = y1_layer(x)
 
@@ -699,9 +700,9 @@ class HopfieldlikeComponent(Component):
         all_losses.append(weight_loss_scaled)
 
       all_losses_op = tf.add_n(all_losses, name='total_pm_loss')
-      self._build_optimizer(all_losses_op, 'training_pm' + name_suffix)
+      self._build_optimizer(all_losses_op, 'training_pm' + name_suffix, scope)
     else:
-      self._build_optimizer(loss, 'training_pm' + name_suffix)
+      self._build_optimizer(loss, 'training_pm' + name_suffix, scope)
 
     return y
 
@@ -884,9 +885,9 @@ class HopfieldlikeComponent(Component):
         all_losses.append(weight_loss_scaled)
 
       all_losses_op = tf.add_n(all_losses, name='total_pr_loss')
-      self._build_optimizer(all_losses_op, 'training_pr')
+      self._build_optimizer(all_losses_op, 'training_pr', scope='pr')
     else:
-      self._build_optimizer(loss, 'training_pr')
+      self._build_optimizer(loss, 'training_pr', scope='pr')
 
     self._dual.set_op('pr_probs', y)    # badly named for historical reasons
 
@@ -1053,15 +1054,21 @@ class HopfieldlikeComponent(Component):
     self._dual.set_op('z_cue_memorise', z_cue_memorise)
     self._dual.set_op('pr_loss', pr_loss)
 
-  def _build_optimizer(self, loss_op, training_op_name):
+  def _build_optimizer(self, loss_op, training_op_name, scope=None):
     """Minimise loss using initialised a tf.train.Optimizer."""
 
     logging.info("-----------> Adding optimiser for op {0}".format(loss_op))
 
-    optimizer = self._setup_optimizer()
-    training = optimizer.minimize(loss_op, global_step=tf.train.get_or_create_global_step())
+    if scope is not None:
+      scope = 'optimizer/' + str(scope)
+    else:
+      scope = 'optimizer'
 
-    self._dual.set_op(training_op_name, training)
+    with tf.variable_scope(scope):
+      optimizer = self._setup_optimizer()
+      training = optimizer.minimize(loss_op, global_step=tf.train.get_or_create_global_step())
+
+      self._dual.set_op(training_op_name, training)
 
   def _setup_optimizer(self):
     """Initialise the Optimizer class specified by a hyperparameter."""
@@ -1573,3 +1580,21 @@ class HopfieldlikeComponent(Component):
       scope=outer_scope + "/pm_raw"
     )
     return pm_raw
+
+  @staticmethod
+  def _variables_cue_nn_optimizer(outer_scope):
+    return tf.get_collection(
+        tf.GraphKeys.GLOBAL_VARIABLES,
+        scope=outer_scope + "/optimizer/pr")
+
+  @staticmethod
+  def _variables_pm_optimizer(outer_scope):
+    return tf.get_collection(
+        tf.GraphKeys.GLOBAL_VARIABLES,
+        scope=outer_scope + "/optimizer/pm")
+
+  @staticmethod
+  def _variables_pm_raw_optimizer(outer_scope):
+    return tf.get_collection(
+        tf.GraphKeys.GLOBAL_VARIABLES,
+        scope=outer_scope + "/optimizer/pm_raw")
