@@ -27,6 +27,7 @@ import tensorflow as tf
 from pagi.components.summarize_levels import SummarizeLevels
 from pagi.utils import logger_utils, tf_utils, image_utils, data_utils
 from pagi.utils.np_utils import print_simple_stats
+from pagi.datasets.omniglot_dataset import OmniglotDataset
 
 from aha.components.episodic_component import EpisodicComponent
 
@@ -247,6 +248,8 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
       if self._dataset_type.__name__ == OmniglotLakeRunsDataset.__name__:
         self._dataset = self._dataset_type(self._dataset_location,
                                            self._hparams.batch_size)
+      if self._dataset_type.__name__ == OmniglotDataset.__name__:
+        self._dataset = self._dataset_type(self._dataset_location)
     else:
       self._dataset = self._dataset_type(self._dataset_location)
 
@@ -298,9 +301,11 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     feed_dict, fetched = super().training(training_handle, training_step, training_fetches)
 
     self._training_features = self._extract_features(fetched)
-    self._training_features['pc'] = self._component.get_pc().get_input('training')      # target output is value to be memorised (the training input)
-    # self._training_features['pc_in'] = self._component.get_pc().get_input('encoding')   # NOTE: this is the output of the PR on the training set
-    self._training_features['pc_in'] = self._component.get_pc().get_input('training')   # NOTE: this is the target (provided by DG), this is not the PR output because it is in 'training' mode.
+
+    if self._component.is_build_pc():
+      self._training_features['pc'] = self._component.get_pc().get_input('training')      # target output is value to be memorised (the training input)
+      # self._training_features['pc_in'] = self._component.get_pc().get_input('encoding')   # NOTE: this is the output of the PR on the training set
+      self._training_features['pc_in'] = self._component.get_pc().get_input('training')   # NOTE: this is the target (provided by DG), this is not the PR output because it is in 'training' mode.
 
     logging.debug("**********>> Training: Batch={},  Training labels = {}".format(training_step, self._training_features['labels'][0]))
 
@@ -1029,15 +1034,13 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     return encoding, decoding
 
   def _reinitialize_networks(self):
+    if not self._component.is_build_pc():
+      return
 
     outer_scope = self._component.name + '/' + self._component.get_pc().name
-    vars = self._component.get_pc().variables_networks(outer_scope)
+    variables = self._component.get_pc().variables_networks(outer_scope)
 
-    logging.info('Reinitialise PC network variables: {0}'.format(vars))
+    logging.info('Reinitialise PC network variables: {0}'.format(variables))
 
-    init_nets = tf.variables_initializer(vars)
+    init_nets = tf.variables_initializer(variables)
     self._session.run(init_nets)
-
-
-
-

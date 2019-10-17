@@ -31,6 +31,7 @@ from pagi.utils import logger_utils, image_utils, np_utils
 from pagi.utils.generic_utils import class_filter
 from pagi.utils.tf_utils import tf_label_filter, tf_invert, tf_set_min
 
+from pagi.datasets.omniglot_dataset import OmniglotDataset
 from aha.datasets.omniglot_lake_dataset import OmniglotLakeDataset
 from aha.datasets.omniglot_lake_runs_dataset import OmniglotLakeRunsDataset
 from aha.utils.recursive_component_harness import RecursiveComponentHarness
@@ -119,7 +120,8 @@ class PatternCompletionWorkflow(Workflow):
   #######################################################
 
   def _is_omniglot_lake(self):
-    return (self._dataset_type.__name__ == OmniglotLakeDataset.__name__) or (
+    return (self._dataset_type.__name__ == OmniglotDataset.__name__) or (
+        self._dataset_type.__name__ == OmniglotLakeDataset.__name__) or (
         self._dataset_type.__name__ == OmniglotLakeRunsDataset.__name__)
 
   @staticmethod
