@@ -1057,7 +1057,7 @@ class HopfieldlikeComponent(Component):
   def _build_optimizer(self, loss_op, training_op_name, scope=None):
     """Minimise loss using initialised a tf.train.Optimizer."""
 
-    logging.info("-----------> Adding optimiser for op {0}".format(loss_op))
+    logging.info("-----------> Adding optimiser for op %s", loss_op)
 
     if scope is not None:
       scope = 'optimizer/' + str(scope)

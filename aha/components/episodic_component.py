@@ -32,6 +32,7 @@ import tensorflow as tf
 from pagi.utils import image_utils, generic_utils
 from pagi.utils.dual import DualData
 from pagi.utils.hparam_multi import HParamMulti
+from pagi.utils.layer_utils import type_activation_fn
 
 from pagi.components.summarize_levels import SummarizeLevels
 from pagi.components.composite_component import CompositeComponent
@@ -42,6 +43,7 @@ from pagi.components.sparse_conv_maxpool import SparseConvAutoencoderMaxPoolComp
 from aha.components.dg_sae import DGSAE
 from aha.components.dg_scae import DGSCAE
 from aha.components.dg_stub import DGStubComponent
+from aha.components.label_learner_fc import LabelLearnerFC
 from aha.components.hopfieldlike_component import HopfieldlikeComponent
 from aha.components.deep_autoencoder_component import DeepAutoencoderComponent
 from aha.components.diff_plasticity_component import DifferentiablePlasticityComponent
@@ -76,7 +78,8 @@ class EpisodicComponent(CompositeComponent):
         batch_size=batch_size,
         output_features='pc',  # the output of this subcomponent is used as the component's features
         pc_type='sae',         # none, hl = hopfield like, sae = sparse autoencoder, dp = differentiable-plasticity
-        dg_type='fc',       # 'none', 'fc', or 'conv' Dentate Gyrus
+        dg_type='fc',          # 'none', 'fc', or 'conv' Dentate Gyrus
+        ll_type='none',        # label learner: 'none', 'fc'
         use_cue_to_pc=False,   # use a secondary input as a cue to pc (EC perforant path to CA3)
         use_pm=False,          # pattern mapping (reconstruct inputs from PC output
         use_interest_filter=False,  # this replaces VC (attentional system zones in on interesting features)
@@ -93,6 +96,7 @@ class EpisodicComponent(CompositeComponent):
       vc = VisualCortexComponent.default_hparams()
     else:
       vc = SparseConvAutoencoderMaxPoolComponent.default_hparams()
+
     dg_fc = DGSAE.default_hparams()
     dg_conv = DGSCAE.default_hparams()
     dg_stub = DGStubComponent.default_hparams()
@@ -101,8 +105,9 @@ class EpisodicComponent(CompositeComponent):
     pc_dp = DifferentiablePlasticityComponent.default_hparams()
     pc_hl = HopfieldlikeComponent.default_hparams()
     ifi = InterestFilter.default_hparams()
+    ll = LabelLearnerFC.default_hparams()
 
-    subcomponents = [vc, dg_fc, dg_conv, dg_stub, pc_sae, pc_dae, pc_dp, pc_hl]   # all possible subcomponents
+    subcomponents = [vc, dg_fc, dg_conv, dg_stub, pc_sae, pc_dae, pc_dp, pc_hl, ll]   # all possible subcomponents
 
     # default overrides of sub-component hparam defaults
     if not HVC_ENABLED:
@@ -147,6 +152,7 @@ class EpisodicComponent(CompositeComponent):
     HParamMulti.add(source=pc_dae, multi=hparam, component='pc_dae')
     HParamMulti.add(source=pc_hl, multi=hparam, component='pc_hl')
     HParamMulti.add(source=ifi, multi=hparam, component='ifi')
+    HParamMulti.add(source=ll, multi=hparam, component='ll')
 
     return hparam
 
@@ -184,6 +190,9 @@ class EpisodicComponent(CompositeComponent):
 
   def is_build_dg(self):
     return self._hparams.dg_type != 'none'
+
+  def is_build_ll(self):
+    return self._hparams.ll_type != 'none'
 
   def is_build_pc(self):
     return self._hparams.pc_type != 'none'
@@ -308,8 +317,18 @@ class EpisodicComponent(CompositeComponent):
 
     return input_values_next, input_next_vis_shape
 
-  def _build_dg(self, input_next, input_next_vis_shape):
+  def _build_ll(self, target_output, train_input, test_input, name='ll'):
+    """Build the label learning component."""
 
+    ll = None
+    if self._hparams.ll_type == 'fc':
+      ll = LabelLearnerFC()
+      ll.build(target_output, train_input, test_input, name)
+
+    return ll
+
+  def _build_dg(self, input_next, input_next_vis_shape):
+    """Builds the pattern separation component."""
     dg_type = self._hparams.dg_type
 
     if dg_type == 'stub':
@@ -428,7 +447,7 @@ class EpisodicComponent(CompositeComponent):
 
     return pc_output, pc_output_shape
 
-  def build(self, input_values, input_shape, hparams, name='episodic'):
+  def build(self, input_values, input_shape, hparams, label_values=None, name='episodic'):
     """Initializes the model parameters.
 
     Args:
@@ -446,6 +465,7 @@ class EpisodicComponent(CompositeComponent):
     self._dual = DualData(self._name)
     self._input_values = input_values
     self._input_shape = input_shape
+    self._label_values = label_values
 
     self.set_signal('input', input_values, input_shape)
 
@@ -469,13 +489,19 @@ class EpisodicComponent(CompositeComponent):
 
       input_next, input_next_vis_shape = self._build_vc(input_values, input_shape)
 
-      self.set_signal('vc', input_next, input_next_vis_shape)
-      self._dual.set_op('vc_encoding', input_next)
+      vc_encoding = input_next
+      self.set_signal('vc', vc_encoding, input_next_vis_shape)
+      self._dual.set_op('vc_encoding', vc_encoding)
+
+      if self.is_build_ll() and self._label_values is not None:
+        print(self._label_values)
+        self._build_ll(self._label_values, vc_encoding, vc_encoding, name='vc_ll')
 
       dg_sparsity = 0
       if self.is_build_dg():
         input_next, input_next_vis_shape, dg_sparsity = self._build_dg(input_next, input_next_vis_shape)
-        self.set_signal('dg', input_next, input_next_vis_shape)
+        dg_encoding = input_next
+        self.set_signal('dg', dg_encoding, input_next_vis_shape)
 
       if self.is_build_pc():
         # Optionally degrade input to PC
@@ -493,6 +519,9 @@ class EpisodicComponent(CompositeComponent):
         if self._hparams.use_pm:
           ec_out_raw = self.get_pc().get_ec_out_raw_op()
           self.set_signal('ec_out_raw', ec_out_raw, input_shape)
+
+        if self.is_build_ll() and self.is_build_dg() and self._label_values is not None:
+          self._build_ll(self._label_values, dg_encoding, pc_output, name='vc_ll')
 
     self.reset()
 
