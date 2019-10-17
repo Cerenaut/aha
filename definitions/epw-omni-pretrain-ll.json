@@ -4,9 +4,13 @@
     "dataset": "pagi.datasets.omniglot_dataset",
     "component": "aha.components.episodic_component",
 
+    "checkpoint": "../ckpts/summaries_20190516-110659/model.ckpt-2000",
+    "checkpoint_load_scope": "episodic/vc",
+    "checkpoint_frozen_scope": "episodic/vc, episodic/dg",
+
     "logging": "info",
     "seed": 4,
-    "batches": 2000,
+    "batches": 100,
 
     "summarize": true,
     "track": true,
@@ -16,6 +20,7 @@
       "batch_size": 128,
       "pc_type": "none",
       "dg_type": "none",
+      "ll_type": "fc",
       "max_outputs": 3,
       "summarize_level": 1,
 
