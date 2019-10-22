@@ -17,6 +17,7 @@
 
 import logging
 
+import numpy as np
 import tensorflow as tf
 
 from pagi.components.summarize_levels import SummarizeLevels
@@ -34,7 +35,7 @@ class LabelLearnerFC(SummaryComponent):
         batch_size=1,
         learning_rate=0.0001,
         optimizer='adam',
-        ll_train_dropout_keep_prob=1.0,  # 1.0=off: dropout in nn that learns the cue from EC
+        train_dropout_keep_prob=1.0,  # 1.0=off: dropout in nn that learns the cue from EC
         test_with_noise=0.0,  # 0.0=off: noise to EC for testing generalisation of learning cue with nn
         train_with_noise=0.0,  # 0.0=off: noise to EC for testing generalisation of learning cue with nn
         train_with_noise_pp=0.0,
@@ -46,65 +47,74 @@ class LabelLearnerFC(SummaryComponent):
         max_outputs=3
     )
 
-  def __init__(self):
-    self._name = None
-    self._hparams = None
-    self._dual = None
-    self._summary_values = None
-    self._batch_type = None
+  def get_batch_type(self):
+    return self._batch_type
 
-  def build(self, target_output, train_input, test_input, name='ll'):
+  def _kernel_initializer(self):
+    w_factor = 1.0  # factor=1.0 for Xavier, 2.0 for He
+    # w_mode = 'FAN_IN'
+    w_mode = 'FAN_AVG'
+    kernel_initializer = tf.contrib.layers.variance_scaling_initializer(factor=w_factor, mode=w_mode,
+                                                                        uniform=False)
+    return kernel_initializer
+
+  def build(self, target_output, train_input, test_input, hparams, name='ll'):
     """Build the Label Learner network."""
+    self.name = name
+    self._hparams = hparams
 
-    with tf.variable_scope(self._name):
+    with tf.variable_scope(self.name):
+      self._batch_type = tf.placeholder_with_default(input='training', shape=[], name='batch_type')
+
       # 0) nn params
       # ------------------------------------
-      non_linearity = self._hparams.ll_linearity
-      hidden_size = self._hparams.ll_hidden_size
+      non_linearity = self._hparams.non_linearity
+      hidden_size = self._hparams.hidden_size
 
       # 1) organise inputs to network
       # ------------------------------------
-
+      self._dual.set_op('target_output', target_output)
       t_nn_shape = target_output.get_shape().as_list()
       t_nn_size = np.prod(t_nn_shape[1:])
+
+      x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
+                     lambda: train_input,
+                     lambda: test_input)
 
       # 2) build the network
       # ------------------------------------
       # apply noise at train and/or test time, to regularise / test generalisation
-      x_nn = tf.cond(tf.equal(self._batch_type, 'encoding'),
-                     lambda: image_utils.add_image_salt_noise_flat(test_input, None,
-                                                                   noise_val=self._hparams.ll_test_with_noise,
-                                                                   noise_factor=self._hparams.ll_test_with_noise_pp),
-                     lambda: test_input)
+      # x_nn = tf.cond(tf.equal(self._batch_type, 'encoding'),
+      #                lambda: image_utils.add_image_salt_noise_flat(x_nn, None,
+      #                                                              noise_val=self._hparams.test_with_noise,
+      #                                                              noise_factor=self._hparams.test_with_noise_pp),
+      #                lambda: x_nn)
 
-      x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
-                     lambda: image_utils.add_image_salt_noise_flat(train_input, None,
-                                                                   noise_val=self._hparams.ll_train_with_noise,
-                                                                   noise_factor=self._hparams.ll_train_with_noise_pp),
-                     lambda: train_input)
+      # x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
+      #                lambda: image_utils.add_image_salt_noise_flat(x_nn, None,
+      #                                                              noise_val=self._hparams.train_with_noise,
+      #                                                              noise_factor=self._hparams.train_with_noise_pp),
+      #                lambda: x_nn)
 
       # apply dropout during training
-      keep_prob = self._hparams.ll_train_dropout_keep_prob
+      keep_prob = self._hparams.train_dropout_keep_prob
       x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
                      lambda: tf.nn.dropout(x_nn, keep_prob),
                      lambda: x_nn)
 
-      self._dual.set_op('ll_x_nn', x_nn)  # input to the pr path nn
+      self._dual.set_op('x_nn', x_nn)
+
+      x_nn = tf.layers.flatten(x_nn)
 
       # Hidden layer[s]
       weights = []
 
+      # Build hidden layer(s)
       if hidden_size > 0:
-        w_factor = 1.0  # factor=1.0 for Xavier, 2.0 for He
-        # w_mode = 'FAN_IN'
-        w_mode = 'FAN_AVG'
-        kernel_initializer = tf.contrib.layers.variance_scaling_initializer(factor=w_factor, mode=w_mode,
-                                                                            uniform=False)
-
         layer_hidden = tf.layers.Dense(units=hidden_size,
                                        activation=type_activation_fn(non_linearity),
-                                       name="hidden",
-                                       kernel_initializer=kernel_initializer)
+                                       name='hidden',
+                                       kernel_initializer=self._kernel_initializer())
 
         hidden_out = layer_hidden(x_nn)
         weights.append(layer_hidden.weights[0])
@@ -119,32 +129,33 @@ class LabelLearnerFC(SummaryComponent):
       else:
         hidden_out = x_nn
 
-      w_factor = 1.0  # factor=1.0 for Xavier, 2.0 for He
-      # w_mode = 'FAN_IN'
-      w_mode = 'FAN_AVG'
-      kernel_initializer = tf.contrib.layers.variance_scaling_initializer(factor=w_factor, mode=w_mode,
-                                                                          uniform=False)
-
+      # Build output layer
       layer_out = tf.layers.Dense(units=t_nn_size,
-                                  name="logits",
-                                  kernel_initializer=kernel_initializer)  # units = number of logits
-      logits = layer_out(hidden_out)
+                                  name='logits',
+                                  kernel_initializer=self._kernel_initializer())
 
+      logits = layer_out(hidden_out)
       weights.append(layer_out.weights[0])
       weights.append(layer_out.weights[1])
 
       f = tf.nn.softmax(logits)  # Unit range
-      loss = tf.losses.softmax_cross_entropy_with_logits(target_output, logits)
-
       y = tf.stop_gradient(f)
 
-      if self._hparams.ll_l2_regularizer > 0.0:
+      self._dual.set_op('preds', y)
+      self._dual.set_op('logits', logits)
+
+      # Build loss function
+      loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=target_output, logits=logits)
+      loss = tf.reduce_mean(loss)
+      self._dual.set_op('loss', loss)
+
+      if self._hparams.l2_regularizer > 0.0:
         all_losses = [loss]
 
         for weight in weights:
           weight_loss = tf.nn.l2_loss(weight)
           weight_loss_sum = tf.reduce_sum(weight_loss)
-          weight_loss_scaled = weight_loss_sum * self._hparams.cue_nn_l2_regularizer
+          weight_loss_scaled = weight_loss_sum * self._hparams.l2_regularizer
           all_losses.append(weight_loss_scaled)
 
         all_losses_op = tf.add_n(all_losses)
@@ -191,15 +202,15 @@ class LabelLearnerFC(SummaryComponent):
     self._dual.update_feed_dict(feed_dict, names)
 
     feed_dict.update({
-        self._dual.get_pl('batch_type'): batch_type
+        self._batch_type: batch_type
     })
 
   def add_fetches(self, fetches, batch_type='training'):
     """Adds ops that will get evaluated."""
-    names = ['loss', 'encoding', 'decoding', 'inputs']
+    names = ['loss', 'target_output', 'preds']
 
     if batch_type == 'training':
-      names.extend(['training'])
+      names.extend(['training_ll'])
 
     self._dual.add_fetches(fetches, names)
 
@@ -212,8 +223,31 @@ class LabelLearnerFC(SummaryComponent):
     # Loss (not a tensor)
     self._loss = fetched[self.name]['loss']
 
-    names = ['encoding', 'decoding', 'inputs']
+    names = ['loss', 'target_output', 'preds']
     self._dual.set_fetches(fetched, names)
 
     # Summaries
     super().set_fetches(fetched, batch_type)
+
+  def _build_summaries(self, batch_type=None, max_outputs=3):
+    """Builds all summaries."""
+    summaries = []
+    max_outputs = self._hparams.max_outputs
+
+    if self._hparams.summarize_level == SummarizeLevels.OFF.value:
+      return summaries
+
+    preds = self._dual.get_op('preds')
+    labels = self._dual.get_op('target_output')
+
+    matches = tf.equal(tf.argmax(preds, 1), tf.argmax(labels, 1))
+    accuracy = tf.reduce_mean(tf.cast(matches, tf.float32))
+
+    loss_summary = tf.summary.scalar('accuracy', accuracy)
+    summaries.append(loss_summary)
+
+    # Loss
+    loss_summary = tf.summary.scalar('loss', self._dual.get_op('loss'))
+    summaries.append(loss_summary)
+
+    return summaries
