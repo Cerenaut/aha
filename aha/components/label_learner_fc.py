@@ -35,9 +35,10 @@ class LabelLearnerFC(SummaryComponent):
         batch_size=1,
         learning_rate=0.0001,
         optimizer='adam',
-        train_dropout_keep_prob=1.0,  # 1.0=off: dropout in nn that learns the cue from EC
-        test_with_noise=0.0,  # 0.0=off: noise to EC for testing generalisation of learning cue with nn
-        train_with_noise=0.0,  # 0.0=off: noise to EC for testing generalisation of learning cue with nn
+        train_input_dropout_keep_prob=1.0,  # 1.0=off
+        train_hidden_dropout_keep_prob=1.0,  # 1.0=off
+        test_with_noise=0.0,  # 0.0=off
+        train_with_noise=0.0,  # 0.0=off
         train_with_noise_pp=0.0,
         test_with_noise_pp=0.0,
         hidden_size=500,
@@ -81,6 +82,8 @@ class LabelLearnerFC(SummaryComponent):
                      lambda: train_input,
                      lambda: test_input)
 
+      x_nn = tf.layers.flatten(x_nn)
+
       # 2) build the network
       # ------------------------------------
       # apply noise at train and/or test time, to regularise / test generalisation
@@ -97,9 +100,9 @@ class LabelLearnerFC(SummaryComponent):
       #                lambda: x_nn)
 
       # apply dropout during training
-      keep_prob = self._hparams.train_dropout_keep_prob
+      input_keep_prob = self._hparams.train_input_dropout_keep_prob
       x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
-                     lambda: tf.nn.dropout(x_nn, keep_prob),
+                     lambda: tf.nn.dropout(x_nn, input_keep_prob),
                      lambda: x_nn)
 
       self._dual.set_op('x_nn', x_nn)
@@ -120,12 +123,10 @@ class LabelLearnerFC(SummaryComponent):
         weights.append(layer_hidden.weights[0])
         weights.append(layer_hidden.weights[1])
 
-        # Optional dropout on hidden layer in addition to input dropout, potentially at different rate.
-        keep_prob = 1.0
-        if keep_prob < 1.0:
-          hidden_out = tf.cond(tf.equal(self._batch_type, 'training'),
-                               lambda: tf.nn.dropout(hidden_out, keep_prob),
-                               lambda: hidden_out)
+        hidden_keep_prob = self._hparams.train_hidden_dropout_keep_prob
+        hidden_out = tf.cond(tf.equal(self._batch_type, 'training'),
+                             lambda: tf.nn.dropout(hidden_out, hidden_keep_prob),
+                             lambda: hidden_out)
       else:
         hidden_out = x_nn
 
@@ -240,9 +241,14 @@ class LabelLearnerFC(SummaryComponent):
     preds = self._dual.get_op('preds')
     labels = self._dual.get_op('target_output')
 
-    matches = tf.equal(tf.argmax(preds, 1), tf.argmax(labels, 1))
-    accuracy = tf.reduce_mean(tf.cast(matches, tf.float32))
+    correct_predictions = tf.equal(tf.argmax(preds, 1), tf.argmax(labels, 1))
+    correct_predictions = tf.cast(correct_predictions, tf.float32)
 
+    total_correct_predictions = tf.reduce_sum(correct_predictions)
+    correct_predictions_summary = tf.summary.scalar('correct_predictions', total_correct_predictions)
+    summaries.append(correct_predictions_summary)
+
+    accuracy = tf.reduce_mean(correct_predictions)
     loss_summary = tf.summary.scalar('accuracy', accuracy)
     summaries.append(loss_summary)
 
