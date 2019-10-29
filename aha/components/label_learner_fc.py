@@ -260,6 +260,18 @@ class LabelLearnerFC(SummaryComponent):
 
     return summaries
 
+  def variables_networks(self, outer_scope):
+    vars_nets = []
+
+    # Selectively include/exclude optimizer parameters
+    optim_ll = True
+
+    vars_nets += self._variables_ll(outer_scope)
+    if optim_ll:
+      vars_nets += self._variables_ll_optimizer(outer_scope)
+
+    return vars_nets
+
   @staticmethod
   def _variables_ll(outer_scope):
     return tf.get_collection(
