@@ -112,6 +112,8 @@ class LabelLearnerFC(SummaryComponent):
       # Hidden layer[s]
       weights = []
 
+      print('x_nn', x_nn)
+
       # Build hidden layer(s)
       if hidden_size > 0:
         layer_hidden = tf.layers.Dense(units=hidden_size,
@@ -257,3 +259,17 @@ class LabelLearnerFC(SummaryComponent):
     summaries.append(loss_summary)
 
     return summaries
+
+  @staticmethod
+  def _variables_ll(outer_scope):
+    return tf.get_collection(
+        tf.GraphKeys.GLOBAL_VARIABLES,
+        scope=outer_scope
+    )
+
+  @staticmethod
+  def _variables_ll_optimizer(outer_scope):
+    return tf.get_collection(
+        tf.GraphKeys.GLOBAL_VARIABLES,
+        scope=outer_scope + "/optimizer"
+    )
