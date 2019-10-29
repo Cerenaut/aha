@@ -1538,17 +1538,27 @@ class HopfieldlikeComponent(Component):
     return summaries
 
   def variables_networks(self, outer_scope):
-
     vars_nets = []
+
+    # Selectively include/exclude optimizer parameters
+    optim_pr = True
+    optim_pm = True
+    optim_pm_raw = True
 
     if self._use_input_cue:
       vars_nets += self._variables_cue_nn(outer_scope)
+      if optim_pr:
+        vars_nets += self._variables_cue_nn_optimizer(outer_scope)
 
     if self._use_pm:
       vars_nets += self._variables_pm(outer_scope)
+      if optim_pm:
+        vars_nets += self._variables_pm_optimizer(outer_scope)
 
     if self.use_pm_raw:
       vars_nets += self._variables_pm_raw(outer_scope)
+      if optim_pm_raw:
+        vars_nets += self._variables_pm_raw_optimizer(outer_scope)
 
     return vars_nets
 
