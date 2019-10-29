@@ -4,20 +4,20 @@
     "dataset": "aha.datasets.omniglot_supervised_dataset",
     "component": "aha.components.episodic_component",
 
-    "checkpoint": "/home/incubator/agief-remote-run/storage/checkpoints/episodic/summaries_20190516-110659/model.ckpt-2000",
-    "checkpoint_load_scope": "episodic/vc",
-    "checkpoint_frozen_scope": "episodic/vc, episodic/dg",
+    "checkpoint": "/home/incubator/agief-remote-run/aha/run/summaries_20191029-164825/model.ckpt-2000",
+
+
 
     "logging": "info",
     "seed": 4,
-    "batches": 2000,
+    "batches": 84,
 
     "summarize": true,
     "track": true,
     "tb_debug": false,
 
     "hparams_override": {
-      "batch_size": 128,
+      "batch_size": 100,
       "output_features": "vc",
       "pc_type": "none",
       "dg_type": "none",
@@ -34,7 +34,7 @@
       "max_outputs": 3,
 
       "vc_num_layers": 1,
-      "vc_batch_size": 128,
+      "vc_batch_size": 100,
       "vc_learning_rate": [0.001],
       "vc_sparsity": [4],
       "vc_sparsity_output_factor": [1.0],
@@ -52,7 +52,7 @@
       "vc_summarize_level": [1],
       "vc_max_outputs": [3],
 
-      "ifi_batch_size": 128,
+      "ifi_batch_size": 100,
       "ifi_num_features": 15,
       "ifi_scale_range": [1.0],
       "ifi_pe_size": 15,
@@ -65,7 +65,7 @@
       "ifi_summarize_level": 1,
       "ifi_max_outputs": 3,
 
-      "ll_vc_batch_size": 128,
+      "ll_vc_batch_size": 100,
       "ll_vc_hidden_size": 0,
       "ll_vc_learning_rate": 0.001,
       "ll_vc_l2_regularizer": 0.0,
@@ -79,6 +79,7 @@
   },
   "workflow-options": {
     "num_repeats": 1,
+    "train": false,
     "evaluate": true,
     "invert_images": true,
     "resize_images_factor": 0.5,
