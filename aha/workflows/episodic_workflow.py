@@ -99,7 +99,13 @@ class EpisodicWorkflow(CompositeWorkflow):
 
     self._component = self._component_type()
     self._component._degrade_type = self._opts['degrade_type']
-    self._component.build(self._inputs, self._dataset.shape, self._hparams, 'episodic')
+
+    labels_one_hot = tf.one_hot(self._labels, self._dataset.num_classes)
+
+    print('labels =', labels_one_hot)
+
+    self._component.build(self._inputs, self._dataset.shape, self._hparams,
+                         label_values=labels_one_hot, name='episodic')
 
     if self._summarize:
       batch_types = ['training', 'encoding']
@@ -261,23 +267,8 @@ class EpisodicWorkflow(CompositeWorkflow):
     }
 
     feed_dict.update(feed_dict_batch_type)
+
     return feed_dict
-
-  def _setup_train_batch_types(self):
-    """Set the batch types, adjusting for which ones should be frozen"""
-    batch_types = {
-        'episodic/episodic': 'training',
-        'episodic/vc': 'training',
-        'episodic/dg': 'training',
-        'episodic/pc': 'training'
-    }
-
-    if self._checkpoint_opts['checkpoint_frozen_scope']:
-      for key in self._checkpoint_opts['checkpoint_frozen_scope'].split(','):
-        key = key.lstrip().rstrip()
-        batch_types[key] = 'encoding'
-
-    return batch_types
 
   def _set_degrade_options(self, feed_dict):
     """
