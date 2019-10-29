@@ -108,10 +108,6 @@ class OmniglotUnseenOneShotDataset(OmniglotUnseenDataset):
     test_files, test_labels = shuffle(test_files, test_labels)
     unseen_files, unseen_labels = shuffle(unseen_files, unseen_labels)
 
-    print(np.unique(unseen_labels), '\n')
-    print(np.unique(train_labels), '\n')
-    print(np.unique(test_labels), '\n')
-
     # then repeatedly sample with removal, assembling all batches
     data_show = []
     data_match = []

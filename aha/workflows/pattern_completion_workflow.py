@@ -120,9 +120,10 @@ class PatternCompletionWorkflow(Workflow):
   #######################################################
 
   def _is_omniglot_lake(self):
-    return (self._dataset_type.__name__ == OmniglotDataset.__name__) or (
-        self._dataset_type.__name__ == OmniglotLakeDataset.__name__) or (
-        self._dataset_type.__name__ == OmniglotLakeRunsDataset.__name__)
+    return self._dataset_type.__name__.startswith('Omniglot')
+    # return (self._dataset_type.__name__ == OmniglotDataset.__name__) or (
+    #     self._dataset_type.__name__ == OmniglotLakeDataset.__name__) or (
+    #     self._dataset_type.__name__ == OmniglotLakeRunsDataset.__name__)
 
   @staticmethod
   def validate_batch_include_all_classes(feature, label, classes):  # pylint: disable=W0613
@@ -236,7 +237,9 @@ class PatternCompletionWorkflow(Workflow):
           the_classes = class_filter(self._dataset, the_classes, is_superclass, class_proportion)
           the_dataset = the_dataset.filter(lambda x, y: tf_label_filter(x, y, the_classes))
 
-        the_dataset = the_dataset.shuffle(buffer_size=10000, seed=(self._seed+seed_increment))
+        # Only shuffle training set
+        if is_train:
+          the_dataset = the_dataset.shuffle(buffer_size=10000, seed=(self._seed+seed_increment))
 
       if invert_images:
         the_dataset = the_dataset.map(lambda x, y: tf_invert(x, y))
@@ -387,6 +390,7 @@ class PatternCompletionWorkflow(Workflow):
     for batch in range(num_batches):
 
       logging.debug("----------------- Batch: %s", str(batch))
+      feed_dict = {}
 
       if train:
         global_step = tf.train.get_global_step(self._session.graph)
@@ -410,14 +414,14 @@ class PatternCompletionWorkflow(Workflow):
             self.export(self._session, feed_dict)
 
         if self._export_opts['export_checkpoint']:
-          if (batch == num_batches - 1) or ((batch + 1) % num_batches == 0):
+          if (batch == num_batches - 1) or ((batch + 1) % self._export_opts['interval_batches'] == 0):
             self._saver.save(self._session, os.path.join(self._summary_dir, 'model.ckpt'), global_step=batch + 1)
 
-        if evaluate:
-          logging.debug("----------------- Complete with training_step: %s", str(training_step))
-          losses = self._complete_pattern(feed_dict, training_handle, test_handle, batch)
+      if evaluate:
+        logging.debug("----------------- Complete with training_step: %s", str(batch))
+        losses = self._complete_pattern(feed_dict, training_handle, test_handle, batch)
 
-          self._on_after_evaluate(losses, batch)
+        self._on_after_evaluate(losses, batch)
 
   def _on_after_evaluate(self, results, batch):
     """Record losses after evaluation is completed."""
@@ -587,6 +591,6 @@ class PatternCompletionWorkflow(Workflow):
       fetched = self.step_graph(self._component, feed_dict, batch_type, fetches=testing_fetches)
 
     if self._is_write_evaluate_summary():
-      self._component.write_summaries(test_step, self._writer)
+      self._component.write_summaries(test_step, self._writer, batch_type=batch_type)
 
     return fetched
