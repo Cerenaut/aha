@@ -79,8 +79,8 @@ class EpisodicComponent(CompositeComponent):
         output_features='pc',  # the output of this subcomponent is used as the component's features
         pc_type='sae',         # none, hl = hopfield like, sae = sparse autoencoder, dp = differentiable-plasticity
         dg_type='fc',          # 'none', 'fc', or 'conv' Dentate Gyrus
-        ll_vc_type='none',        # label learner: 'none', 'fc'
-        ll_pc_type='none',        # label learner: 'none', 'fc'
+        ll_vc_type='none',     # vc label learner: 'none', 'fc'
+        ll_pc_type='none',     # pc label learner: 'none', 'fc'
         use_cue_to_pc=False,   # use a secondary input as a cue to pc (EC perforant path to CA3)
         use_pm=False,          # pattern mapping (reconstruct inputs from PC output
         use_interest_filter=False,  # this replaces VC (attentional system zones in on interesting features)
@@ -154,8 +154,8 @@ class EpisodicComponent(CompositeComponent):
     HParamMulti.add(source=pc_dae, multi=hparam, component='pc_dae')
     HParamMulti.add(source=pc_hl, multi=hparam, component='pc_hl')
     HParamMulti.add(source=ifi, multi=hparam, component='ifi')
-    HParamMulti.add(source=ll, multi=hparam, component='ll_vc')
-    HParamMulti.add(source=ll, multi=hparam, component='ll_pc')
+    HParamMulti.add(source=ll_vc, multi=hparam, component='ll_vc')
+    HParamMulti.add(source=ll_pc, multi=hparam, component='ll_pc')
 
     return hparam
 
@@ -559,6 +559,12 @@ class EpisodicComponent(CompositeComponent):
 
   def get_decoding(self):
     return self.get_pc().get_decoding()
+
+  def get_ll_vc(self):
+    return self.get_sub_component('ll_vc')
+
+  def get_ll_pc(self):
+    return self.get_sub_component('ll_pc')
 
   def get_batch_type(self, name=None):
     """
