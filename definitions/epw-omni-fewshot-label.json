@@ -4,7 +4,7 @@
     "dataset": "aha.datasets.omniglot_unseen_oneshot_dataset",
     "component": "aha.components.episodic_component",
 
-    "checkpoint": "../ckpts/summaries_20191029-164825/model.ckpt-2000",
+    "checkpoint": "/home/incubator/agief-remote-run/aha/run/summaries_20191029-164825/model.ckpt-2000",
     "checkpoint_load_scope": "episodic/vc, episodic/ll_vc",
     "checkpoint_frozen_scope": "episodic/vc, episodic/ll_vc, episodic/dg",
 
@@ -22,7 +22,7 @@
       "pc_type": "hl",
       "dg_type": "fc",
       "ll_vc_type": "fc",
-      "ll_pc_type": "none",
+      "ll_pc_type": "fc",
       "use_cue_to_pc": true,
       "use_pm": true,
       "use_interest_filter": true,
