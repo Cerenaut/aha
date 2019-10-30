@@ -87,17 +87,17 @@ class LabelLearnerFC(SummaryComponent):
       # 2) build the network
       # ------------------------------------
       # apply noise at train and/or test time, to regularise / test generalisation
-      # x_nn = tf.cond(tf.equal(self._batch_type, 'encoding'),
-      #                lambda: image_utils.add_image_salt_noise_flat(x_nn, None,
-      #                                                              noise_val=self._hparams.test_with_noise,
-      #                                                              noise_factor=self._hparams.test_with_noise_pp),
-      #                lambda: x_nn)
+      x_nn = tf.cond(tf.equal(self._batch_type, 'encoding'),
+                     lambda: image_utils.add_image_salt_noise_flat(x_nn, None,
+                                                                   noise_val=self._hparams.test_with_noise,
+                                                                   noise_factor=self._hparams.test_with_noise_pp),
+                     lambda: x_nn)
 
-      # x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
-      #                lambda: image_utils.add_image_salt_noise_flat(x_nn, None,
-      #                                                              noise_val=self._hparams.train_with_noise,
-      #                                                              noise_factor=self._hparams.train_with_noise_pp),
-      #                lambda: x_nn)
+      x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
+                     lambda: image_utils.add_image_salt_noise_flat(x_nn, None,
+                                                                   noise_val=self._hparams.train_with_noise,
+                                                                   noise_factor=self._hparams.train_with_noise_pp),
+                     lambda: x_nn)
 
       # apply dropout during training
       input_keep_prob = self._hparams.train_input_dropout_keep_prob
@@ -111,8 +111,6 @@ class LabelLearnerFC(SummaryComponent):
 
       # Hidden layer[s]
       weights = []
-
-      print('x_nn', x_nn)
 
       # Build hidden layer(s)
       if hidden_size > 0:
@@ -146,6 +144,20 @@ class LabelLearnerFC(SummaryComponent):
 
       self._dual.set_op('preds', y)
       self._dual.set_op('logits', logits)
+
+      # Compute accuracy
+      preds = self._dual.get_op('preds')
+      labels = self._dual.get_op('target_output')
+
+      unseen_idxs = (0, 1)
+
+      correct_predictions = tf.equal(tf.argmax(preds, 1), tf.argmax(labels, 1))
+      correct_predictions = tf.cast(correct_predictions, tf.float32)
+
+      self._dual.set_op('correct_predictions', correct_predictions)
+      self._dual.set_op('accuracy', tf.reduce_mean(correct_predictions))
+      self._dual.set_op('accuracy_unseen', tf.reduce_mean(correct_predictions[unseen_idxs[0]:unseen_idxs[1]]))
+      self._dual.set_op('total_correct_predictions', tf.reduce_sum(correct_predictions))
 
       # Build loss function
       loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=target_output, logits=logits)
@@ -210,7 +222,7 @@ class LabelLearnerFC(SummaryComponent):
 
   def add_fetches(self, fetches, batch_type='training'):
     """Adds ops that will get evaluated."""
-    names = ['loss', 'target_output', 'preds']
+    names = ['loss', 'accuracy', 'accuracy_unseen', 'target_output', 'preds']
 
     if batch_type == 'training':
       names.extend(['training_ll'])
@@ -226,7 +238,7 @@ class LabelLearnerFC(SummaryComponent):
     # Loss (not a tensor)
     self._loss = fetched[self.name]['loss']
 
-    names = ['loss', 'target_output', 'preds']
+    names = ['loss', 'accuracy', 'accuracy_unseen', 'target_output', 'preds']
     self._dual.set_fetches(fetched, names)
 
     # Summaries
@@ -240,19 +252,15 @@ class LabelLearnerFC(SummaryComponent):
     if self._hparams.summarize_level == SummarizeLevels.OFF.value:
       return summaries
 
-    preds = self._dual.get_op('preds')
-    labels = self._dual.get_op('target_output')
-
-    correct_predictions = tf.equal(tf.argmax(preds, 1), tf.argmax(labels, 1))
-    correct_predictions = tf.cast(correct_predictions, tf.float32)
-
-    total_correct_predictions = tf.reduce_sum(correct_predictions)
-    correct_predictions_summary = tf.summary.scalar('correct_predictions', total_correct_predictions)
+    correct_predictions_summary = tf.summary.scalar('correct_predictions',
+                                                    self._dual.get_op('total_correct_predictions'))
     summaries.append(correct_predictions_summary)
 
-    accuracy = tf.reduce_mean(correct_predictions)
-    loss_summary = tf.summary.scalar('accuracy', accuracy)
-    summaries.append(loss_summary)
+    accuracy_summary = tf.summary.scalar('accuracy', self._dual.get_op('accuracy'))
+    summaries.append(accuracy_summary)
+
+    accuracy_unseen_summary = tf.summary.scalar('accuracy_unseen', self._dual.get_op('accuracy_unseen'))
+    summaries.append(accuracy_unseen_summary)
 
     # Loss
     loss_summary = tf.summary.scalar('loss', self._dual.get_op('loss'))
@@ -264,9 +272,10 @@ class LabelLearnerFC(SummaryComponent):
     vars_nets = []
 
     # Selectively include/exclude optimizer parameters
-    optim_ll = True
+    optim_ll = False
 
     vars_nets += self._variables_ll(outer_scope)
+
     if optim_ll:
       vars_nets += self._variables_ll_optimizer(outer_scope)
 
@@ -274,10 +283,15 @@ class LabelLearnerFC(SummaryComponent):
 
   @staticmethod
   def _variables_ll(outer_scope):
-    return tf.get_collection(
+    variables = tf.get_collection(
         tf.GraphKeys.GLOBAL_VARIABLES,
-        scope=outer_scope
+        scope=outer_scope + "/hidden"
     )
+    variables += tf.get_collection(
+        tf.GraphKeys.GLOBAL_VARIABLES,
+        scope=outer_scope + "/logits"
+    )
+    return variables
 
   @staticmethod
   def _variables_ll_optimizer(outer_scope):

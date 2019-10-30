@@ -446,14 +446,30 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
         if self._is_decoding_pc_at_dg():
           pc_at_dg = self._decoder(test_step, 'pc', 'dg', pc_completion, testing_feed_dict,
-                                  summarise=summarise)  # equiv to dg recon/vc hidden
+                                   summarise=summarise)  # equiv to dg recon/vc hidden
           pc_at_vc_input = pc_at_dg  # Feed DG decoding to VC, instead of PC
 
         if self._is_decoding_pc_at_vc():
           # this doesn't make much sense if we are using the interest filter (and dimensions don't match)
           if not self._hparams.use_interest_filter:
             pc_at_vc = self._decoder(test_step, 'pc', 'vc', pc_at_vc_input, testing_feed_dict,
-                                    summarise=summarise)     # equiv to vc recon
+                                     summarise=summarise)     # equiv to vc recon
+
+      # 8) Analyse classification performance with and without AMTL
+      # --------------------------------------------------------------
+      if self._component.is_build_ll_vc():
+        losses['ll_vc_accuracy'] = self._component.get_ll_vc().get_values('accuracy')
+        losses['ll_vc_accuracy_unseen'] = self._component.get_ll_vc().get_values('accuracy_unseen')
+
+        self._report_average_metric('ll_vc_accuracy', losses['ll_vc_accuracy'])
+        self._report_average_metric('ll_vc_accuracy_unseen', losses['ll_vc_accuracy_unseen'])
+
+      if self._component.is_build_ll_pc():
+        losses['ll_pc_accuracy'] = self._component.get_ll_pc().get_values('accuracy')
+        losses['ll_pc_accuracy_unseen'] = self._component.get_ll_pc().get_values('accuracy_unseen')
+
+        self._report_average_metric('ll_pc_accuracy', losses['ll_pc_accuracy'])
+        self._report_average_metric('ll_pc_accuracy_unseen', losses['ll_pc_accuracy_unseen'])
 
       modes = self._opts['evaluate_mode']
       self._compute_few_shot_metrics(losses, modes, pc_in, pc_completion, pc_at_dg, pc_at_vc)
