@@ -219,7 +219,7 @@ class PatternCompletionWorkflow(Workflow):
           # additional decodes for every every num_batch_repeats
           repeats = repeats + additional_test_decodes
 
-      logging.info("-----------------------> is_train={},   repeat={}   ({})".format(is_train, repeats, additional_test_decodes))
+      logging.debug("-----------------------> is_train={},   repeat={}   ({})".format(is_train, repeats, additional_test_decodes))
 
       if is_train:
         the_dataset = self._dataset.get_train()

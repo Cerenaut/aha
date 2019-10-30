@@ -1,7 +1,7 @@
 {
   "experiment-options": {
     "workflow": "aha.workflows.episodic_few_shot_workflow",
-    "dataset": "aha.datasets.omniglot_lake_dataset",
+    "dataset": "aha.datasets.omniglot_unseen_oneshot_dataset",
     "component": "aha.components.episodic_component",
 
     "checkpoint": "/home/incubator/agief-remote-run/storage/checkpoints/episodic/summaries_20191029-164825/model.ckpt-2000",
@@ -21,8 +21,8 @@
       "output_features": "dg",
       "pc_type": "hl",
       "dg_type": "fc",
-      "ll_vc_type": "none",
-      "ll_pc_type": "none",
+      "ll_vc_type": "fc",
+      "ll_pc_type": "fc",
       "use_cue_to_pc": true,
       "use_pm": true,
       "use_interest_filter": true,
@@ -148,7 +148,7 @@
       "ll_pc_train_with_noise_pp": 0.0,
       "ll_pc_test_with_noise": 0.0,
       "ll_pc_test_with_noise_pp": 0.0,
-      "ll_pc_train_input_dropout_keep_prob": 0.75,
+      "ll_pc_train_input_dropout_keep_prob": 1.0,
       "ll_pc_train_hidden_dropout_keep_prob": 1.0
     }
   },

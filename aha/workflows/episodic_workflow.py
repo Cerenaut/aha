@@ -100,8 +100,6 @@ class EpisodicWorkflow(CompositeWorkflow):
     self._component = self._component_type()
     self._component._degrade_type = self._opts['degrade_type']
 
-    self._inputs = tf.Print(self._inputs, [self._inputs], 'inputs = ')
-    self._labels = tf.Print(self._labels, [self._labels], 'labels = ')
     labels_one_hot = tf.one_hot(self._labels, self._dataset.num_classes)
 
     self._component.build(self._inputs, self._dataset.shape, self._hparams,

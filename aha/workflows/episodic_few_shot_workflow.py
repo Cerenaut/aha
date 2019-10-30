@@ -233,6 +233,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
                                                                   recurse_test=self._is_inference_recursive(),
                                                                   num_batch_repeats=self._opts['num_repeats'],
                                                                   recurse_iterations=self._opts['recurse_iterations'],
+                                                                  additional_test_decodes=1,
                                                                   evaluate_step=self._opts['evaluate'],
                                                                   use_trainset_for_tests=same_train_and_test,
                                                                   invert_images=self._opts['invert_images'],
