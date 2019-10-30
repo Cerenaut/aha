@@ -522,6 +522,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
       if (batch+1) % self._logging_freq == 0:
         logging.info(output)
 
+    # print("Train Labels: " + str(self._training_features['labels']))
+    # print("Test Labels: " + str(self._testing_features['labels']))
+
     if not self._is_eval_batch(batch):
       return
 

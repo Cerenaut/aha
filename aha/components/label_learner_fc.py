@@ -222,7 +222,7 @@ class LabelLearnerFC(SummaryComponent):
 
   def add_fetches(self, fetches, batch_type='training'):
     """Adds ops that will get evaluated."""
-    names = ['loss', 'accuracy', 'accuracy_unseen', 'target_output', 'preds']
+    names = ['loss', 'accuracy', 'accuracy_unseen']
 
     if batch_type == 'training':
       names.extend(['training_ll'])
@@ -238,7 +238,7 @@ class LabelLearnerFC(SummaryComponent):
     # Loss (not a tensor)
     self._loss = fetched[self.name]['loss']
 
-    names = ['loss', 'accuracy', 'accuracy_unseen', 'target_output', 'preds']
+    names = ['loss', 'accuracy', 'accuracy_unseen']
     self._dual.set_fetches(fetched, names)
 
     # Summaries

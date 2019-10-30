@@ -219,7 +219,7 @@ class PatternCompletionWorkflow(Workflow):
           # additional decodes for every every num_batch_repeats
           repeats = repeats + additional_test_decodes
 
-      logging.debug("-----------------------> is_train={},   repeat={}   ({})".format(is_train, repeats, additional_test_decodes))
+      logging.info("-----------------------> is_train={},   repeat={}   ({})".format(is_train, repeats, additional_test_decodes))
 
       if is_train:
         the_dataset = self._dataset.get_train()
@@ -237,9 +237,7 @@ class PatternCompletionWorkflow(Workflow):
           the_classes = class_filter(self._dataset, the_classes, is_superclass, class_proportion)
           the_dataset = the_dataset.filter(lambda x, y: tf_label_filter(x, y, the_classes))
 
-        # Only shuffle training set
-        if is_train:
-          the_dataset = the_dataset.shuffle(buffer_size=10000, seed=(self._seed+seed_increment))
+        the_dataset = the_dataset.shuffle(buffer_size=10000, seed=(self._seed+seed_increment))
 
       if invert_images:
         the_dataset = the_dataset.map(lambda x, y: tf_invert(x, y))

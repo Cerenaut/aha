@@ -110,14 +110,18 @@ class OmniglotUnseenOneShotDataset(OmniglotUnseenDataset):
 
     # then repeatedly sample with removal, assembling all batches
     data_show = []
+    data_show_idx = []
     data_match = []
+    data_match_idx = []
+
+    unseen_idx = 0
 
     end_batches = False
     batch_num = -1
     while not end_batches:
       batch_num += 1
 
-      if batch_num >= 20:
+      if len(data_show) >= (20 * self._batch_size):
         break
 
       # build a new batch
@@ -129,13 +133,11 @@ class OmniglotUnseenOneShotDataset(OmniglotUnseenDataset):
       for i, sample in enumerate(range(self._batch_size)):
         show_files, show_labels = train_files, train_labels
         match_files, match_labels = test_files, test_labels
-        # files, labels = train_files, train_files
 
         # first element is unseen
-        if i == 0:
+        if i == unseen_idx:
           show_files, show_labels = unseen_files, unseen_labels
           match_files, match_labels = unseen_files, unseen_labels
-          # files, labels = unseen_files, unseen_labels
 
         # select first sample that is not in batch so far (to get unique)
         index = -1
@@ -147,34 +149,54 @@ class OmniglotUnseenOneShotDataset(OmniglotUnseenDataset):
         # detect reaching the end of the dataset i.e. not able to assemble a new batch
         if index == -1:
           logging.info('Not able to find a unique class to assemble a new batch, '
-                       'on batch={0}, sample={1}'.format(batch_num, sample))
+                       'on batch=%s, sample=%s', batch_num, sample)
           end_batches = True
           break
 
+        # Try to select unique samples to assemble the batch
         try:
-          # add to the 'show' dataset
-          file = show_files.pop(index)
-          label = show_labels.pop(index)
-          data_show.append([file, label])
-
-          batch_labels.append(label)   # remember which labels we added to this batch
+          show_index = index
+          show_file = show_files[show_index]
+          show_label = show_labels[show_index]
 
           # select same class for a 'match' sample
-          index = match_labels.index(label)
+          match_index = match_labels.index(show_label)
 
           # add to the 'match' dataset
-          file = match_files.pop(index)
-          label = match_labels.pop(index)
-          data_match.append([file, label])
+          match_file = match_files[match_index]
+          match_label = match_labels[match_index]
         except ValueError:
-          logging.info('Not able to find a unique sample for this class to assemble this batch, '
-                       'on batch={0}, sample={1}'.format(batch_num, sample))
-          # end_batches = True
+          logging.info('Skipping this batch due to lack of unique samples remaining for this class,'
+                       'on batch=%s, sample=%s', batch_num, sample)
           break
+
+        assert show_label == match_label
+
+        # Add samples to the dataset
+        data_show.append([show_file, show_label])
+        data_show_idx.append(show_index)
+
+        data_match.append([match_file, match_label])
+        data_match_idx.append(match_index)
+
+        # Remember which labels we added to this batch
+        batch_labels.append(show_label)
+
+        # Remove selected samples from the source data
+        show_files.pop(show_index)
+        show_labels.pop(show_index)
+        match_files.pop(match_index)
+        match_labels.pop(match_index)
 
     # convert from array of pairs, to pair of arrays
     self._dataset_show_files, self._dataset_show_labels = map(list, zip(*data_show))
     self._dataset_match_files, self._dataset_match_labels = map(list, zip(*data_match))
+
+    print('show_labels', self._dataset_show_labels, len(self._dataset_show_labels), '\n')
+    print('show_idx', data_show_idx, len(data_show_idx), '\n')
+
+    print('match_labels', self._dataset_match_labels, len(self._dataset_match_labels), '\n')
+    print('match_idx', data_match_idx, len(data_match_idx), '\n')
 
   def get_classes_by_superclass(self, superclasses, proportion=1.0):
     """
