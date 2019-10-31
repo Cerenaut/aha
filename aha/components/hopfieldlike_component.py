@@ -1543,7 +1543,7 @@ class HopfieldlikeComponent(Component):
     # Selectively include/exclude optimizer parameters
     optim_pr = False
     optim_pm = False
-    optim_pm_raw = False
+    optim_pm_raw = True
 
     if self._use_input_cue:
       vars_nets += self._variables_cue_nn(outer_scope)
