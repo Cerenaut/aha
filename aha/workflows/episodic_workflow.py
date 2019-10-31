@@ -100,10 +100,13 @@ class EpisodicWorkflow(CompositeWorkflow):
     self._component = self._component_type()
     self._component._degrade_type = self._opts['degrade_type']
 
-    labels_one_hot = tf.one_hot(self._labels, self._dataset.num_classes)
+    labels = self._labels
+
+    if labels.dtype != tf.string:
+      labels = tf.one_hot(self._labels, self._dataset.num_classes)
 
     self._component.build(self._inputs, self._dataset.shape, self._hparams,
-                         label_values=labels_one_hot, name='episodic')
+                         label_values=labels, name='episodic')
 
     if self._summarize:
       batch_types = ['training', 'encoding']
