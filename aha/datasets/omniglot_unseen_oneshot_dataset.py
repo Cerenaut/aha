@@ -137,7 +137,7 @@ class OmniglotUnseenOneShotDataset(OmniglotUnseenDataset):
         # first element is unseen
         if i == unseen_idx:
           show_files, show_labels = unseen_files, unseen_labels
-          match_files, match_labels = unseen_files, unseen_labels
+          match_files, match_labels = show_files, show_labels
 
         # select first sample that is not in batch so far (to get unique)
         index = -1
@@ -153,21 +153,31 @@ class OmniglotUnseenOneShotDataset(OmniglotUnseenDataset):
           end_batches = True
           break
 
+        show_files_ = show_files.copy()
+        show_labels_ = show_labels.copy()
+
+        if i == unseen_idx:
+          match_files_ = show_files_
+          match_labels_ = show_labels_
+        else:
+          match_files_ = match_files.copy()
+          match_labels_ = match_labels.copy()
+
         # Try to select unique samples to assemble the batch
         try:
           show_index = index
-          show_file = show_files[show_index]
-          show_label = show_labels[show_index]
+          show_file = show_files_.pop(show_index)
+          show_label = show_labels_.pop(show_index)
 
           # select same class for a 'match' sample
-          match_index = match_labels.index(show_label)
+          match_index = match_labels_.index(show_label)
 
           # add to the 'match' dataset
-          match_file = match_files[match_index]
-          match_label = match_labels[match_index]
+          match_file = match_files_.pop(match_index)
+          match_label = match_labels_.pop(match_index)
         except ValueError:
-          logging.info('Skipping this batch due to lack of unique samples remaining for this class,'
-                       'on batch=%s, sample=%s', batch_num, sample)
+          # logging.info('Skipping this batch due to lack of unique samples remaining for this class,'
+          #              'on batch=%s, sample=%s', batch_num, sample)
           break
 
         assert show_label == match_label

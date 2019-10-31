@@ -139,6 +139,8 @@ class LabelLearnerFC(SummaryComponent):
       weights.append(layer_out.weights[0])
       weights.append(layer_out.weights[1])
 
+      self._weights = weights
+
       f = tf.nn.softmax(logits)  # Unit range
       y = tf.stop_gradient(f)
 
@@ -262,6 +264,10 @@ class LabelLearnerFC(SummaryComponent):
     accuracy_unseen_summary = tf.summary.scalar('accuracy_unseen', self._dual.get_op('accuracy_unseen'))
     summaries.append(accuracy_unseen_summary)
 
+    # for i, weight in enumerate(self._weights):
+    #   weight_summary = tf.summary.scalar('weight_' + str(i), tf.reduce_sum(weight))
+    #   summaries.append(weight_summary)
+
     # Loss
     loss_summary = tf.summary.scalar('loss', self._dual.get_op('loss'))
     summaries.append(loss_summary)
@@ -272,7 +278,7 @@ class LabelLearnerFC(SummaryComponent):
     vars_nets = []
 
     # Selectively include/exclude optimizer parameters
-    optim_ll = False
+    optim_ll = True
 
     vars_nets += self._variables_ll(outer_scope)
 
