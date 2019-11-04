@@ -23,8 +23,10 @@ import tensorflow as tf
 from pagi.components.summarize_levels import SummarizeLevels
 from pagi.utils import image_utils
 from pagi.utils.layer_utils import type_activation_fn
-
 from pagi.components.summary_component import SummaryComponent
+
+from aha.utils.generic_utils import build_kernel_initializer
+
 
 class LabelLearnerFC(SummaryComponent):
 
@@ -117,7 +119,7 @@ class LabelLearnerFC(SummaryComponent):
         layer_hidden = tf.layers.Dense(units=hidden_size,
                                        activation=type_activation_fn(non_linearity),
                                        name='hidden',
-                                       kernel_initializer=self._kernel_initializer())
+                                       kernel_initializer=build_kernel_initializer('xavier'))
 
         hidden_out = layer_hidden(x_nn)
         weights.append(layer_hidden.weights[0])
@@ -133,7 +135,7 @@ class LabelLearnerFC(SummaryComponent):
       # Build output layer
       layer_out = tf.layers.Dense(units=t_nn_size,
                                   name='logits',
-                                  kernel_initializer=self._kernel_initializer())
+                                  kernel_initializer=build_kernel_initializer('xavier'))
 
       logits = layer_out(hidden_out)
       weights.append(layer_out.weights[0])

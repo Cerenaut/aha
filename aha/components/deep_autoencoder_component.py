@@ -34,6 +34,8 @@ from pagi.utils.layer_utils import type_activation_fn
 from pagi.components.summarize_levels import SummarizeLevels
 from pagi.components.autoencoder_component import AutoencoderComponent
 
+from aha.utils.generic_utils import build_kernel_initializer
+
 
 class DeepAutoencoderComponent(AutoencoderComponent):
   """Deep Autoencoder with untied weights (and untied biases)."""
@@ -190,17 +192,6 @@ class DeepAutoencoderComponent(AutoencoderComponent):
 
     return optimizer
 
-  def _get_kernel_initializer(self, init_type='he'):
-    if init_type == 'he':
-      init_factor = 2.0
-      init_mode = 'FAN_IN'
-    elif init_type == 'xavier':
-      init_factor = 1.0
-      init_mode = 'FAN_AVG'
-    else:
-      raise NotImplementedError('Initializer not supported: ' + str(init_type))
-    return tf.contrib.layers.variance_scaling_initializer(factor=init_factor, mode=init_mode, uniform=False)
-
   def _build(self):
     """Build the autoencoder network"""
 
@@ -211,7 +202,7 @@ class DeepAutoencoderComponent(AutoencoderComponent):
     input_shape = self._input_values.get_shape().as_list()
     output_shape = np.prod(input_shape[1:])
 
-    kernel_initializer = self._get_kernel_initializer('xavier')
+    kernel_initializer = build_kernel_initializer('xavier')
 
     assert self._hparams.num_layers == len(self._hparams.filters)
     assert self._hparams.num_layers == len(self._hparams.nonlinearity)
