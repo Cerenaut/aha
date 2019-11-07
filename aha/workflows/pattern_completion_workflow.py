@@ -31,6 +31,7 @@ from pagi.utils import logger_utils, image_utils, np_utils
 from pagi.utils.generic_utils import class_filter
 from pagi.utils.tf_utils import tf_label_filter, tf_invert, tf_set_min
 
+from pagi.datasets.omniglot_dataset import OmniglotDataset
 from aha.datasets.omniglot_lake_dataset import OmniglotLakeDataset
 from aha.datasets.omniglot_lake_runs_dataset import OmniglotLakeRunsDataset
 from aha.utils.recursive_component_harness import RecursiveComponentHarness
@@ -119,8 +120,10 @@ class PatternCompletionWorkflow(Workflow):
   #######################################################
 
   def _is_omniglot_lake(self):
-    return (self._dataset_type.__name__ == OmniglotLakeDataset.__name__) or (
-        self._dataset_type.__name__ == OmniglotLakeRunsDataset.__name__)
+    return self._dataset_type.__name__.startswith('Omniglot')
+    # return (self._dataset_type.__name__ == OmniglotDataset.__name__) or (
+    #     self._dataset_type.__name__ == OmniglotLakeDataset.__name__) or (
+    #     self._dataset_type.__name__ == OmniglotLakeRunsDataset.__name__)
 
   @staticmethod
   def validate_batch_include_all_classes(feature, label, classes):  # pylint: disable=W0613
@@ -385,6 +388,7 @@ class PatternCompletionWorkflow(Workflow):
     for batch in range(num_batches):
 
       logging.debug("----------------- Batch: %s", str(batch))
+      feed_dict = {}
 
       if train:
         global_step = tf.train.get_global_step(self._session.graph)
@@ -408,14 +412,14 @@ class PatternCompletionWorkflow(Workflow):
             self.export(self._session, feed_dict)
 
         if self._export_opts['export_checkpoint']:
-          if (batch == num_batches - 1) or ((batch + 1) % num_batches == 0):
+          if (batch == num_batches - 1) or ((batch + 1) % self._export_opts['interval_batches'] == 0):
             self._saver.save(self._session, os.path.join(self._summary_dir, 'model.ckpt'), global_step=batch + 1)
 
-        if evaluate:
-          logging.debug("----------------- Complete with training_step: %s", str(training_step))
-          losses = self._complete_pattern(feed_dict, training_handle, test_handle, batch)
+      if evaluate:
+        logging.debug("----------------- Complete with training_step: %s", str(batch))
+        losses = self._complete_pattern(feed_dict, training_handle, test_handle, batch)
 
-          self._on_after_evaluate(losses, batch)
+        self._on_after_evaluate(losses, batch)
 
   def _on_after_evaluate(self, results, batch):
     """Record losses after evaluation is completed."""
@@ -585,6 +589,6 @@ class PatternCompletionWorkflow(Workflow):
       fetched = self.step_graph(self._component, feed_dict, batch_type, fetches=testing_fetches)
 
     if self._is_write_evaluate_summary():
-      self._component.write_summaries(test_step, self._writer)
+      self._component.write_summaries(test_step, self._writer, batch_type=batch_type)
 
     return fetched

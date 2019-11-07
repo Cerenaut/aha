@@ -1,7 +1,7 @@
 {
   "experiment-options": {
     "workflow": "aha.workflows.episodic_few_shot_workflow",
-    "dataset": "datasets.omniglot_dataset",
+    "dataset": "pagi.datasets.omniglot_dataset",
     "component": "aha.components.episodic_component",
 
     "logging": "info",
@@ -17,10 +17,10 @@
       "pc_type": "none",
       "dg_type": "none",
       "max_outputs": 3,
-      "summarize_level": 0,
+      "summarize_level": 1,
 
       "vc_num_layers": 1,
-      "vc_batch_size": [128],
+      "vc_batch_size": 128,
       "vc_learning_rate": [0.001],
       "vc_sparsity": [1],
       "vc_sparsity_output_factor": [1.0],
@@ -33,8 +33,10 @@
       "vc_use_unpooling": ["fixed"],
       "vc_use_max_pool": ["none"],
       "vc_secondary": [true],
-      "vc_nonlinearity": ["none"],
-      "vc_summarize_level": [1],
+      "vc_encoder_nonlinearity": ["none"],
+      "vc_decoder_nonlinearity": ["none"],
+      "vc_summarize_level": [0],
+      "vc_summarize_decoding": [true],
       "vc_max_outputs": [3]
     }
   },
@@ -68,10 +70,7 @@
     "evaluate": false,
     "train": true,
     "visualise_vc": false,
-    "visualise_dg_at_vc": false,
-    "visualise_pc_at_dg": false,
-    "visualise_pc_at_vc": false,
-    "evaluate_mode": "simple",
+    "evaluate_mode": ["simple"],
     "evaluate_supermode": "none"
   }
 }

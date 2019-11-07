@@ -1,7 +1,7 @@
 {
   "experiment-options": {
     "workflow": "aha.workflows.episodic_few_shot_workflow",
-    "dataset": "aha.datasets.omniglot_lake_dataset",
+    "dataset": "aha.datasets.omniglot_lake_runs_dataset",
     "component": "aha.components.episodic_component",
 
     "checkpoint": "/home/incubator/agief-remote-run/storage/checkpoints/episodic/summaries_20190516-110659/model.ckpt-2000",
@@ -9,7 +9,7 @@
     "checkpoint_frozen_scope": "episodic/vc, episodic/dg",
 
     "logging": "info",
-    "seed": 5,
+    "seed": 42,
     "batches": 800,
 
     "summarize": true,
@@ -96,8 +96,8 @@
       "pc_hl_pm_l1_size": 100,
       "pc_hl_pm_raw_l1_size": 100,
       "pc_hl_pm_raw_l2_regularizer": 0.00004,
-      "pc_hl_pm_raw_nonlinearity": "leaky_relu",
-      "pc_hl_pm_noise_type": "s",
+      "pc_hl_pm_raw_nonlinearity": "tanh",
+      "pc_hl_pm_noise_type": "sp",
       "pc_hl_pm_train_with_noise": 0.0,
       "pc_hl_pm_train_with_noise_pp": 0.0,
 
@@ -162,7 +162,7 @@
     "rsummary_batches": 0,
     "visualise_vc": false,
     "visualise_if_at_vc": false,
-    "evaluate_mode": ["instance"],
+    "evaluate_mode": ["oneshot"],
     "evaluate_supermode": "none",
     "summarize_completion": "to_file"
   },

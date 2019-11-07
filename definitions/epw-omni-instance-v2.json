@@ -96,8 +96,8 @@
       "pc_hl_pm_l1_size": 100,
       "pc_hl_pm_raw_l1_size": 100,
       "pc_hl_pm_raw_l2_regularizer": 0.00004,
-      "pc_hl_pm_raw_nonlinearity": "leaky_relu",
-      "pc_hl_pm_noise_type": "s",
+      "pc_hl_pm_raw_nonlinearity": "tanh",
+      "pc_hl_pm_noise_type": "sp",
       "pc_hl_pm_train_with_noise": 0.0,
       "pc_hl_pm_train_with_noise_pp": 0.0,
 

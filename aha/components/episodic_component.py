@@ -32,6 +32,7 @@ import tensorflow as tf
 from pagi.utils import image_utils, generic_utils
 from pagi.utils.dual import DualData
 from pagi.utils.hparam_multi import HParamMulti
+from pagi.utils.layer_utils import type_activation_fn
 
 from pagi.components.summarize_levels import SummarizeLevels
 from pagi.components.composite_component import CompositeComponent
@@ -42,6 +43,7 @@ from pagi.components.sparse_conv_maxpool import SparseConvAutoencoderMaxPoolComp
 from aha.components.dg_sae import DGSAE
 from aha.components.dg_scae import DGSCAE
 from aha.components.dg_stub import DGStubComponent
+from aha.components.label_learner_fc import LabelLearnerFC
 from aha.components.hopfieldlike_component import HopfieldlikeComponent
 from aha.components.deep_autoencoder_component import DeepAutoencoderComponent
 from aha.components.diff_plasticity_component import DifferentiablePlasticityComponent
@@ -76,7 +78,9 @@ class EpisodicComponent(CompositeComponent):
         batch_size=batch_size,
         output_features='pc',  # the output of this subcomponent is used as the component's features
         pc_type='sae',         # none, hl = hopfield like, sae = sparse autoencoder, dp = differentiable-plasticity
-        dg_type='fc',       # 'none', 'fc', or 'conv' Dentate Gyrus
+        dg_type='fc',          # 'none', 'fc', or 'conv' Dentate Gyrus
+        ll_vc_type='none',     # vc label learner: 'none', 'fc'
+        ll_pc_type='none',     # pc label learner: 'none', 'fc'
         use_cue_to_pc=False,   # use a secondary input as a cue to pc (EC perforant path to CA3)
         use_pm=False,          # pattern mapping (reconstruct inputs from PC output
         use_interest_filter=False,  # this replaces VC (attentional system zones in on interesting features)
@@ -93,6 +97,7 @@ class EpisodicComponent(CompositeComponent):
       vc = VisualCortexComponent.default_hparams()
     else:
       vc = SparseConvAutoencoderMaxPoolComponent.default_hparams()
+
     dg_fc = DGSAE.default_hparams()
     dg_conv = DGSCAE.default_hparams()
     dg_stub = DGStubComponent.default_hparams()
@@ -101,8 +106,10 @@ class EpisodicComponent(CompositeComponent):
     pc_dp = DifferentiablePlasticityComponent.default_hparams()
     pc_hl = HopfieldlikeComponent.default_hparams()
     ifi = InterestFilter.default_hparams()
+    ll_vc = LabelLearnerFC.default_hparams()
+    ll_pc = LabelLearnerFC.default_hparams()
 
-    subcomponents = [vc, dg_fc, dg_conv, dg_stub, pc_sae, pc_dae, pc_dp, pc_hl]   # all possible subcomponents
+    subcomponents = [vc, dg_fc, dg_conv, dg_stub, pc_sae, pc_dae, pc_dp, pc_hl, ll_vc, ll_pc]   # all possible subcomponents
 
     # default overrides of sub-component hparam defaults
     if not HVC_ENABLED:
@@ -147,6 +154,8 @@ class EpisodicComponent(CompositeComponent):
     HParamMulti.add(source=pc_dae, multi=hparam, component='pc_dae')
     HParamMulti.add(source=pc_hl, multi=hparam, component='pc_hl')
     HParamMulti.add(source=ifi, multi=hparam, component='ifi')
+    HParamMulti.add(source=ll_vc, multi=hparam, component='ll_vc')
+    HParamMulti.add(source=ll_pc, multi=hparam, component='ll_pc')
 
     return hparam
 
@@ -184,6 +193,12 @@ class EpisodicComponent(CompositeComponent):
 
   def is_build_dg(self):
     return self._hparams.dg_type != 'none'
+
+  def is_build_ll_vc(self):
+    return self._hparams.ll_vc_type != 'none'
+
+  def is_build_ll_pc(self):
+    return self._hparams.ll_pc_type != 'none'
 
   def is_build_pc(self):
     return self._hparams.pc_type != 'none'
@@ -308,8 +323,34 @@ class EpisodicComponent(CompositeComponent):
 
     return input_values_next, input_next_vis_shape
 
-  def _build_dg(self, input_next, input_next_vis_shape):
+  def _build_ll_vc(self, target_output, train_input, test_input, name='ll_vc'):
+    """Build the label learning component for LTM."""
+    ll_vc = None
 
+    if self._hparams.ll_vc_type == 'fc':
+      ll_vc = LabelLearnerFC()
+      self._add_sub_component(ll_vc, name)
+      hparams_ll_vc = LabelLearnerFC.default_hparams()
+      hparams_ll_vc = HParamMulti.override(multi=self._hparams, target=hparams_ll_vc, component='ll_vc')
+      ll_vc.build(target_output, train_input, test_input, hparams_ll_vc, name)
+
+    return ll_vc
+
+  def _build_ll_pc(self, target_output, train_input, test_input, name='ll_pc'):
+    """Build the label learning component for PC."""
+    ll_pc = None
+
+    if self._hparams.ll_pc_type == 'fc':
+      ll_pc = LabelLearnerFC()
+      self._add_sub_component(ll_pc, name)
+      hparams_ll_pc = LabelLearnerFC.default_hparams()
+      hparams_ll_pc = HParamMulti.override(multi=self._hparams, target=hparams_ll_pc, component='ll_pc')
+      ll_pc.build(target_output, train_input, test_input, hparams_ll_pc, name)
+
+    return ll_pc
+
+  def _build_dg(self, input_next, input_next_vis_shape):
+    """Builds the pattern separation component."""
     dg_type = self._hparams.dg_type
 
     if dg_type == 'stub':
@@ -428,7 +469,7 @@ class EpisodicComponent(CompositeComponent):
 
     return pc_output, pc_output_shape
 
-  def build(self, input_values, input_shape, hparams, name='episodic'):
+  def build(self, input_values, input_shape, hparams, label_values=None, name='episodic'):
     """Initializes the model parameters.
 
     Args:
@@ -446,6 +487,7 @@ class EpisodicComponent(CompositeComponent):
     self._dual = DualData(self._name)
     self._input_values = input_values
     self._input_shape = input_shape
+    self._label_values = label_values
 
     self.set_signal('input', input_values, input_shape)
 
@@ -455,7 +497,6 @@ class EpisodicComponent(CompositeComponent):
     logging.debug('Input Area: %s', input_area)
 
     with tf.variable_scope(self._name, reuse=tf.AUTO_REUSE):
-
       # Optionally degrade input to VC
       degrade_step_pl = self._dual.add('degrade_step', shape=[],  # e.g. hidden, input, none
                                        default_value='none').add_pl(default=True, dtype=tf.string)
@@ -469,13 +510,18 @@ class EpisodicComponent(CompositeComponent):
 
       input_next, input_next_vis_shape = self._build_vc(input_values, input_shape)
 
-      self.set_signal('vc', input_next, input_next_vis_shape)
-      self._dual.set_op('vc_encoding', input_next)
+      vc_encoding = input_next
+      self.set_signal('vc', vc_encoding, input_next_vis_shape)
+      self._dual.set_op('vc_encoding', vc_encoding)
+
+      if self.is_build_ll_vc() and self._label_values is not None:
+        self._build_ll_vc(self._label_values, vc_encoding, vc_encoding)
 
       dg_sparsity = 0
       if self.is_build_dg():
         input_next, input_next_vis_shape, dg_sparsity = self._build_dg(input_next, input_next_vis_shape)
-        self.set_signal('dg', input_next, input_next_vis_shape)
+        dg_encoding = input_next
+        self.set_signal('dg', dg_encoding, input_next_vis_shape)
 
       if self.is_build_pc():
         # Optionally degrade input to PC
@@ -494,15 +540,31 @@ class EpisodicComponent(CompositeComponent):
           ec_out_raw = self.get_pc().get_ec_out_raw_op()
           self.set_signal('ec_out_raw', ec_out_raw, input_shape)
 
+        if self.is_build_ll_pc() and self.is_build_dg() and self._label_values is not None:
+          self._build_ll_pc(self._label_values, dg_encoding, pc_output)
+
     self.reset()
 
-  def _add_sub_component(self, component, name):
-    self._sub_components[name] = component
+  def get_vc(self):
+    vc = self.get_sub_component('vc')
+    return vc
 
-  def get_sub_component(self, name):
-    if name in self._sub_components:
-      return self._sub_components[name]
-    return None
+  def get_pc(self):
+    pc = self.get_sub_component('pc')
+    return pc
+
+  def get_dg(self):
+    dg = self.get_sub_component('dg')
+    return dg
+
+  def get_decoding(self):
+    return self.get_pc().get_decoding()
+
+  def get_ll_vc(self):
+    return self.get_sub_component('ll_vc')
+
+  def get_ll_pc(self):
+    return self.get_sub_component('ll_pc')
 
   def get_batch_type(self, name=None):
     """
@@ -521,31 +583,12 @@ class EpisodicComponent(CompositeComponent):
 
     return self._sub_components[name].get_batch_type()
 
-  def get_dual(self, name=None):
-    if name is None:
-      return self._dual
-    return self._sub_components[name].get_dual()
-
-  def get_vc(self):
-    vc = self.get_sub_component('vc')
-    return vc
-
-  def get_pc(self):
-    pc = self.get_sub_component('pc')
-    return pc
-
-  def get_dg(self):
-    dg = self.get_sub_component('dg')
-    return dg
-
-  def get_decoding(self):
-    return self.get_pc().get_decoding()
-
   def get_features(self, batch_type='training'):
     """
     The output of the component is taken from one of the subcomponents, depending on hparams.
     If not vc or dg, the fallback is to take from pc regardless of value of the hparam
     """
+    del batch_type
     if self._hparams.output_features == 'vc':
       features = self.get_vc().get_features()
     elif self._hparams.output_features == 'dg':
@@ -553,11 +596,6 @@ class EpisodicComponent(CompositeComponent):
     else:  # self._hparams.output_features == 'pc':
       features = self.get_pc().get_features()
     return features
-
-  def reset(self):
-    """Reset the trained/learned variables and all other state of the component to a new random state."""
-    for c in self._sub_components.values():
-      c.reset()
 
   def _is_skip_for_pc(self, name):
     if self._pc_mode == PCMode.PCOnly:  # only pc
@@ -582,7 +620,6 @@ class EpisodicComponent(CompositeComponent):
       comp.update_feed_dict(feed_dict, self._select_batch_type(batch_type, name))
 
   def add_fetches(self, fetches, batch_type='training'):
-
     # each component adds its own
     for name, comp in self._sub_components.items():
       if self._is_skip_for_pc(name):
@@ -606,9 +643,8 @@ class EpisodicComponent(CompositeComponent):
     summary_op = self._dual.get_op(generic_utils.summary_name(bt))
     if summary_op is not None:
       fetches[self._name]['summaries'] = summary_op
-  
-  def set_fetches(self, fetched, batch_type='training'):
 
+  def set_fetches(self, fetched, batch_type='training'):
     # each component adds its own
     for name, comp in self._sub_components.items():
       if self._is_skip_for_pc(name):
@@ -663,29 +699,12 @@ class EpisodicComponent(CompositeComponent):
       writer.add_summary(self._summary_values, step)    # Write the summaries fetched into _summary_values
       writer.flush()
 
-    # sub components
-    for name, comp in self._sub_components.items():
-      comp.write_summaries(step, writer, self._select_batch_type(batch_type, name))
+    super().write_summaries(step, writer, batch_type)
 
   def write_recursive_summaries(self, step, writer, batch_type=None):
     for name, comp in self._sub_components.items():
       if hasattr(comp, 'write_recursive_summaries'):
         comp.write_recursive_summaries(step, writer, batch_type)
-
-  def write_filters(self, session, folder):
-    with tf.variable_scope(self._name, reuse=tf.AUTO_REUSE):
-      for _, comp in self._sub_components.items():
-        if hasattr(comp, 'write_filters'):
-          comp.write_filters(session, folder)
-
-  def _select_batch_type(self, batch_type, name, as_list=False):
-    name = self._name + '/' + name
-    if isinstance(batch_type, dict):
-      if name in batch_type:
-        batch_type = batch_type[name]
-    if as_list and not isinstance(batch_type, list):
-      batch_type = [batch_type]
-    return batch_type
 
   def build_summaries_episodic(self, batch_types=None, scope=None):
     """Builds all summaries."""
@@ -700,10 +719,6 @@ class EpisodicComponent(CompositeComponent):
           summaries = self._build_summaries(batch_type)
           if len(summaries) > 0:
             self._dual.set_op(generic_utils.summary_name(batch_type), tf.summary.merge(summaries))
-
-  @staticmethod
-  def summary_name(batch_type):
-    return 'summary_' + batch_type
 
   def _build_summaries(self, batch_type='training'):
     """Assumes appropriate name scope has been set."""

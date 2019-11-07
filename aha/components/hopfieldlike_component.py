@@ -30,6 +30,7 @@ from pagi.utils.layer_utils import activation_fn, type_activation_fn
 from pagi.components.component import Component
 from pagi.components.summarize_levels import SummarizeLevels
 
+from aha.utils.generic_utils import build_kernel_initializer
 
 ########################################################################################
 
@@ -670,19 +671,25 @@ class HopfieldlikeComponent(Component):
     target_size = np.prod(target_shape[1:])
     l2_size = target_size
 
+    use_bias = True
+
     weights = []
     scope = 'pm' + name_suffix
     with tf.variable_scope(scope):
-      y1_layer = tf.layers.Dense(units=l1_size, activation=non_linearity1)
+      y1_layer = tf.layers.Dense(units=l1_size, activation=non_linearity1, use_bias=use_bias,
+                                 kernel_initializer=build_kernel_initializer('xavier'))
       y1 = y1_layer(x)
 
-      f_layer = tf.layers.Dense(units=l2_size, activation=non_linearity2)
+      f_layer = tf.layers.Dense(units=l2_size, activation=non_linearity2, use_bias=use_bias,
+                                kernel_initializer=build_kernel_initializer('xavier'))
       f = f_layer(y1)
 
       weights.append(y1_layer.weights[0])
-      weights.append(y1_layer.weights[1])
       weights.append(f_layer.weights[0])
-      weights.append(f_layer.weights[1])
+
+      if use_bias:
+        weights.append(y1_layer.weights[1])
+        weights.append(f_layer.weights[1])
 
       y = tf.stop_gradient(f)   # ensure gradients don't leak into other nn's in PC
 
@@ -804,10 +811,7 @@ class HopfieldlikeComponent(Component):
 
     if hidden_size > 0:
 
-      w_factor = 1.0  # factor=1.0 for Xavier, 2.0 for He
-      # w_mode = 'FAN_IN'
-      w_mode = 'FAN_AVG'
-      kernel_initializer = tf.contrib.layers.variance_scaling_initializer(factor=w_factor, mode=w_mode, uniform=False)
+      kernel_initializer = build_kernel_initializer('xavier')
 
       # hidden_out = tf.layers.dense(inputs=x_nn, units=hidden_size, activation=type_activation_fn(non_linearity),
       #                              name="cue_nn_hidden")
@@ -831,10 +835,7 @@ class HopfieldlikeComponent(Component):
     # Final layer - no dropout (because we don't want to damage the output signal, there's no benefit)
     # No nonlinearity (yet)
 
-    w_factor = 1.0  # factor=1.0 for Xavier, 2.0 for He
-    # w_mode = 'FAN_IN'
-    w_mode = 'FAN_AVG'
-    kernel_initializer = tf.contrib.layers.variance_scaling_initializer(factor=w_factor, mode=w_mode, uniform=False)
+    kernel_initializer = build_kernel_initializer('xavier')
 
     layer_out = tf.layers.Dense(units=t_nn_size,
                                 name="cue_nn_logits",
@@ -1057,7 +1058,7 @@ class HopfieldlikeComponent(Component):
   def _build_optimizer(self, loss_op, training_op_name, scope=None):
     """Minimise loss using initialised a tf.train.Optimizer."""
 
-    logging.info("-----------> Adding optimiser for op {0}".format(loss_op))
+    logging.info("-----------> Adding optimiser for op %s", loss_op)
 
     if scope is not None:
       scope = 'optimizer/' + str(scope)
@@ -1538,17 +1539,27 @@ class HopfieldlikeComponent(Component):
     return summaries
 
   def variables_networks(self, outer_scope):
-
     vars_nets = []
+
+    # Selectively include/exclude optimizer parameters
+    optim_pr = False
+    optim_pm = False
+    optim_pm_raw = True
 
     if self._use_input_cue:
       vars_nets += self._variables_cue_nn(outer_scope)
+      if optim_pr:
+        vars_nets += self._variables_cue_nn_optimizer(outer_scope)
 
     if self._use_pm:
       vars_nets += self._variables_pm(outer_scope)
+      if optim_pm:
+        vars_nets += self._variables_pm_optimizer(outer_scope)
 
     if self.use_pm_raw:
       vars_nets += self._variables_pm_raw(outer_scope)
+      if optim_pm_raw:
+        vars_nets += self._variables_pm_raw_optimizer(outer_scope)
 
     return vars_nets
 

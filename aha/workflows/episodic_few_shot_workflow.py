@@ -27,11 +27,13 @@ import tensorflow as tf
 from pagi.components.summarize_levels import SummarizeLevels
 from pagi.utils import logger_utils, tf_utils, image_utils, data_utils
 from pagi.utils.np_utils import print_simple_stats
+from pagi.datasets.omniglot_dataset import OmniglotDataset
 
 from aha.components.episodic_component import EpisodicComponent
 
 from aha.datasets.omniglot_lake_dataset import OmniglotLakeDataset
 from aha.datasets.omniglot_lake_runs_dataset import OmniglotLakeRunsDataset
+from aha.datasets.omniglot_unseen_oneshot_dataset import OmniglotUnseenOneShotDataset
 
 from aha.workflows.episodic_workflow import EpisodicWorkflow
 from aha.workflows.pattern_completion_workflow import PatternCompletionWorkflow, UseTrainForTest
@@ -216,6 +218,12 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     degrade_test = (self._opts['degrade_step'] == 'test')
     noise_test = (self._opts['noise_step'] == 'test')
 
+    # Temporary fix for mismatched train/test inputs & labels
+    # TODO(@abdel): Investigate this; as PAGI Decoder shouldn't be triggering the iterator
+    additional_decode = 0
+    if self._is_decoding_pc_at_dg():
+      additional_decode += 1
+
     train_dataset, test_dataset = self._gen_datasets_with_options(self._opts['train_classes'],
                                                                   self._opts['test_classes'],
                                                                   is_superclass=self._opts['superclass'],
@@ -231,6 +239,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
                                                                   recurse_test=self._is_inference_recursive(),
                                                                   num_batch_repeats=self._opts['num_repeats'],
                                                                   recurse_iterations=self._opts['recurse_iterations'],
+                                                                  additional_test_decodes=1,
                                                                   evaluate_step=self._opts['evaluate'],
                                                                   use_trainset_for_tests=same_train_and_test,
                                                                   invert_images=self._opts['invert_images'],
@@ -244,9 +253,14 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
                                            self._hparams.batch_size,
                                            self._opts['test_classes'],
                                            self.instance_mode())
-      if self._dataset_type.__name__ == OmniglotLakeRunsDataset.__name__:
+      elif self._dataset_type.__name__ == OmniglotLakeRunsDataset.__name__:
         self._dataset = self._dataset_type(self._dataset_location,
                                            self._hparams.batch_size)
+      elif self._dataset_type.__name__ == OmniglotUnseenOneShotDataset.__name__:
+        self._dataset = self._dataset_type(self._dataset_location,
+                                           self._hparams.batch_size)
+      else:
+        self._dataset = self._dataset_type(self._dataset_location)
     else:
       self._dataset = self._dataset_type(self._dataset_location)
 
@@ -298,9 +312,11 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     feed_dict, fetched = super().training(training_handle, training_step, training_fetches)
 
     self._training_features = self._extract_features(fetched)
-    self._training_features['pc'] = self._component.get_pc().get_input('training')      # target output is value to be memorised (the training input)
-    # self._training_features['pc_in'] = self._component.get_pc().get_input('encoding')   # NOTE: this is the output of the PR on the training set
-    self._training_features['pc_in'] = self._component.get_pc().get_input('training')   # NOTE: this is the target (provided by DG), this is not the PR output because it is in 'training' mode.
+
+    if self._component.is_build_pc():
+      self._training_features['pc'] = self._component.get_pc().get_input('training')      # target output is value to be memorised (the training input)
+      # self._training_features['pc_in'] = self._component.get_pc().get_input('encoding')   # NOTE: this is the output of the PR on the training set
+      self._training_features['pc_in'] = self._component.get_pc().get_input('training')   # NOTE: this is the target (provided by DG), this is not the PR output because it is in 'training' mode.
 
     logging.debug("**********>> Training: Batch={},  Training labels = {}".format(training_step, self._training_features['labels'][0]))
 
@@ -422,40 +438,59 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
       if not self._component.is_build_dg() and not self._component.is_build_pc():
         raise RuntimeError("You need both PC and DG for running `oneshot` or `fewshot` as intended.")
 
-    pc_completion = None
-    pc_at_dg = None
-    pc_at_vc = None
-    pc_in = None
+    if 'simple' not in self._opts['evaluate_mode']:
+      pc_completion = None
+      pc_at_dg = None
+      pc_at_vc = None
+      pc_in = None
 
-    if self._component.get_pc() is not None:
-      pc_completion = self._component.get_pc().get_decoding()                              # equiv to dg hidden
-      pc_in = self._component.get_pc().get_input("encoding")          # the output of cue_nn, input to PC itself
+      if self._component.get_pc() is not None:
+        pc_completion = self._component.get_pc().get_decoding()                              # equiv to dg hidden
+        pc_in = self._component.get_pc().get_input("encoding")          # the output of cue_nn, input to PC itself
 
-      # If not using DG, feed PC decoding directly to VC
-      pc_at_vc_input = pc_completion
+        # If not using DG, feed PC decoding directly to VC
+        pc_at_vc_input = pc_completion
 
-      if self._is_decoding_pc_at_dg():
-        pc_at_dg = self._decoder(test_step, 'pc', 'dg', pc_completion, testing_feed_dict,
-                                 summarise=summarise)  # equiv to dg recon/vc hidden
-        pc_at_vc_input = pc_at_dg  # Feed DG decoding to VC, instead of PC
+        if self._is_decoding_pc_at_dg():
+          pc_at_dg = self._decoder(test_step, 'pc', 'dg', pc_completion, testing_feed_dict,
+                                   summarise=summarise)  # equiv to dg recon/vc hidden
+          pc_at_vc_input = pc_at_dg  # Feed DG decoding to VC, instead of PC
 
-      if self._is_decoding_pc_at_vc():
-        # this doesn't make much sense if we are using the interest filter (and dimensions don't match)
-        if not self._hparams.use_interest_filter:
-          pc_at_vc = self._decoder(test_step, 'pc', 'vc', pc_at_vc_input, testing_feed_dict,
-                                   summarise=summarise)     # equiv to vc recon
+        if self._is_decoding_pc_at_vc():
+          # this doesn't make much sense if we are using the interest filter (and dimensions don't match)
+          if not self._hparams.use_interest_filter:
+            pc_at_vc = self._decoder(test_step, 'pc', 'vc', pc_at_vc_input, testing_feed_dict,
+                                     summarise=summarise)     # equiv to vc recon
 
-    modes = self._opts['evaluate_mode']
-    self._compute_few_shot_metrics(losses, modes, pc_in, pc_completion, pc_at_dg, pc_at_vc)
-    self._prep_for_summaries_after_completion(self._test_inputs,
-                                              with_comparison_images=self._add_comparison_images)    # prepare for more comprehensive summaries
+      # 8) Analyse classification performance with and without AMTL
+      # --------------------------------------------------------------
+      if self._component.is_build_ll_vc():
+        losses['ll_vc_accuracy'] = self._component.get_ll_vc().get_values('accuracy')
+        losses['ll_vc_accuracy_unseen'] = self._component.get_ll_vc().get_values('accuracy_unseen')
 
-    if pc_at_vc is not None:
-      losses['loss_pc_at_vc'] = np.square(self._test_inputs - pc_at_vc).mean()
+        self._report_average_metric('ll_vc_accuracy', losses['ll_vc_accuracy'])
+        self._report_average_metric('ll_vc_accuracy_unseen', losses['ll_vc_accuracy_unseen'])
+
+      if self._component.is_build_ll_pc():
+        losses['ll_pc_accuracy'] = self._component.get_ll_pc().get_values('accuracy')
+        losses['ll_pc_accuracy_unseen'] = self._component.get_ll_pc().get_values('accuracy_unseen')
+
+        self._report_average_metric('ll_pc_accuracy', losses['ll_pc_accuracy'])
+        self._report_average_metric('ll_pc_accuracy_unseen', losses['ll_pc_accuracy_unseen'])
+
+      modes = self._opts['evaluate_mode']
+      self._compute_few_shot_metrics(losses, modes, pc_in, pc_completion, pc_at_dg, pc_at_vc)
+      self._prep_for_summaries_after_completion(self._test_inputs,
+                                                with_comparison_images=self._add_comparison_images)    # prepare for more comprehensive summaries
+
+      if pc_at_vc is not None:
+        losses['loss_pc_at_vc'] = np.square(self._test_inputs - pc_at_vc).mean()
 
     return losses
 
   def _on_after_evaluate(self, results, batch):
+    if 'simple' in self._opts['evaluate_mode']:
+      return
 
     console = True
     matching_matrix_keys = [match_mse_key, match_mse_tf_key, match_olap_key, match_olap_tf_key]
@@ -493,6 +528,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
       if (batch+1) % self._logging_freq == 0:
         logging.info(output)
+
+    # print("Train Labels: " + str(self._training_features['labels']))
+    # print("Test Labels: " + str(self._testing_features['labels']))
 
     if not self._is_eval_batch(batch):
       return
@@ -1029,15 +1067,17 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     return encoding, decoding
 
   def _reinitialize_networks(self):
+    if not self._component.is_build_pc():
+      return
 
     outer_scope = self._component.name + '/' + self._component.get_pc().name
-    vars = self._component.get_pc().variables_networks(outer_scope)
+    variables = self._component.get_pc().variables_networks(outer_scope)
 
-    logging.info('Reinitialise PC network variables: {0}'.format(vars))
+    if self._component.is_build_ll_pc():
+      outer_scope = self._component.name + '/' + self._component.get_ll_pc().name
+      variables += self._component.get_ll_pc().variables_networks(outer_scope)
 
-    init_nets = tf.variables_initializer(vars)
+    logging.info('Reinitialise PC network variables: {0}'.format(variables))
+
+    init_nets = tf.variables_initializer(variables)
     self._session.run(init_nets)
-
-
-
-

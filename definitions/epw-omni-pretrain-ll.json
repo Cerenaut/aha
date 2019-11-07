@@ -1,0 +1,111 @@
+{
+  "experiment-options": {
+    "workflow": "aha.workflows.episodic_few_shot_workflow",
+    "dataset": "aha.datasets.omniglot_supervised_dataset",
+    "component": "aha.components.episodic_component",
+
+    "checkpoint": "/home/incubator/agief-remote-run/storage/checkpoints/episodic/summaries_20190516-110659/model.ckpt-2000",
+    "checkpoint_load_scope": "episodic/vc",
+    "checkpoint_frozen_scope": "episodic/vc, episodic/dg",
+
+    "logging": "info",
+    "seed": 4,
+    "batches": 2000,
+
+    "summarize": true,
+    "track": true,
+    "tb_debug": false,
+
+    "hparams_override": {
+      "batch_size": 128,
+      "output_features": "vc",
+      "pc_type": "none",
+      "dg_type": "none",
+      "ll_vc_type": "fc",
+      "ll_pc_type": "none",
+      "use_cue_to_pc": false,
+      "use_pm": false,
+      "use_interest_filter": true,
+      "vc_norm_per_filter": false,
+      "vc_norm_per_sample": true,
+      "max_pool_vc_final_size": 4,
+      "max_pool_vc_final_stride": 4,
+      "summarize_level": 1,
+      "max_outputs": 3,
+
+      "vc_num_layers": 1,
+      "vc_batch_size": 128,
+      "vc_learning_rate": [0.001],
+      "vc_sparsity": [4],
+      "vc_sparsity_output_factor": [1.0],
+      "vc_filters": [121],
+      "vc_filters_field_width": [10],
+      "vc_filters_field_height": [10],
+      "vc_filters_field_stride": [1],
+      "vc_pool_size": [1],
+      "vc_pool_strides": [1],
+      "vc_use_unpooling": ["fixed"],
+      "vc_use_max_pool": ["none"],
+      "vc_secondary": [true],
+      "vc_encoder_nonlinearity": ["none"],
+      "vc_decoder_nonlinearity": ["none"],
+      "vc_summarize_level": [1],
+      "vc_max_outputs": [3],
+
+      "ifi_batch_size": 128,
+      "ifi_num_features": 15,
+      "ifi_scale_range": [1.0],
+      "ifi_pe_size": 15,
+      "ifi_pe_std": 2.375,
+      "ifi_nms_size": 5,
+      "ifi_nms_stride": 1,
+      "ifi_f_size": 7,
+      "ifi_f_std": 1,
+      "ifi_f_k": 1.6,
+      "ifi_summarize_level": 1,
+      "ifi_max_outputs": 3,
+
+      "ll_vc_batch_size": 128,
+      "ll_vc_hidden_size": 0,
+      "ll_vc_learning_rate": 0.001,
+      "ll_vc_l2_regularizer": 0.0,
+      "ll_vc_train_input_dropout_keep_prob": 1.0,
+      "ll_vc_train_hidden_dropout_keep_prob": 1.0
+    }
+  },
+  "export-options": {
+    "export_filters": true,
+    "interval_batches": 1000
+  },
+  "workflow-options": {
+    "num_repeats": 1,
+    "evaluate": true,
+    "invert_images": true,
+    "resize_images_factor": 0.5,
+    "superclass": true,
+    "class_proportion": 1.0,
+    "train_classes": [],
+    "test_classes": [],
+    "batch_all_classes": false,
+    "batch_no_duplicates": false,
+
+    "degrade_type": "none",
+    "degrade_step": "none",
+    "degrade_factor": 0.0,
+    "degrade_value": 0,
+
+    "noise_type": "none",
+    "noise_step": "none",
+    "noise_factor": 0.0,
+
+    "train_recurse": false,
+    "test_recurse": false,
+    "recurse_iterations": 1,
+    "rsummary_batches": 0,
+    "visualise_vc": false,
+    "visualise_if_at_vc": false,
+    "evaluate_mode": ["simple"],
+    "evaluate_supermode": "none",
+    "summarize_completion": "to_file"
+  }
+}

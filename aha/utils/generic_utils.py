@@ -18,6 +18,19 @@ Episodic-specific general utils.
 """
 
 import numpy as np
+import tensorflow as tf
+
+
+def build_kernel_initializer(init_type='he', uniform=False):
+  if init_type == 'he':
+    init_factor = 2.0
+    init_mode = 'FAN_IN'
+  elif init_type == 'xavier':
+    init_factor = 1.0
+    init_mode = 'FAN_AVG'
+  else:
+    raise NotImplementedError('Initializer not supported: ' + str(init_type))
+  return tf.contrib.layers.variance_scaling_initializer(factor=init_factor, mode=init_mode, uniform=uniform)
 
 
 def overlap(a, b):
