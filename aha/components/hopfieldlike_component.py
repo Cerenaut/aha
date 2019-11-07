@@ -606,8 +606,13 @@ class HopfieldlikeComponent(Component):
   def _build_pm(self):
     """Preprocess the inputs and build the pattern mapping components."""
 
+    def normalize(x):
+      return (x - tf.reduce_min(x)) / (tf.reduce_max(x) - tf.reduce_min(x))
+
     # map to input
     pc_out = self._dual.get_op('y')  # output of Hopfield (PC)
+    pc_out = normalize(pc_out)
+
     pc_target = self._dual.get_op('pr_target')
 
     x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
