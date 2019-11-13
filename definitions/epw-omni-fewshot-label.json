@@ -153,7 +153,8 @@
     }
   },
   "export-options": {
-    "export_filters": false
+    "export_filters": false,
+    "interval_batches": 40
   },
   "workflow-options": {
     "num_repeats": 40,
