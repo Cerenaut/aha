@@ -20,6 +20,7 @@ from __future__ import division
 from __future__ import print_function
 
 import logging
+import random
 
 import numpy as np
 import tensorflow as tf
@@ -142,6 +143,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     self._add_comparison_images = False   # add the comparison images to the completion_summary if it is used
     self._paper = False                    # figures rendered for the paper
 
+    self._replay_inputs = []
+    self._replay_labels = []
+
   def _test_consistency(self):
     super()._test_consistency()
 
@@ -177,6 +181,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
     if not self._component.get_pc().use_nn_in_pr_path():
       return True
+
+    # if self._build_replay_dataset(batch):
+    #   return True
 
     # PC with recall path --> must be on num_repeats
     if (batch + 1) % self._opts['num_repeats'] == 0:
@@ -296,11 +303,69 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         print("{}, ".format(av), end='')
       print('\n')
 
+  def _replay_mode(self):
+    return 'replay' in self._opts['evaluate_mode']
+
+  def _build_replay_dataset(self, step):
+    # return self._replay_mode() and step % self._opts['num_repeats'] == 0
+    return self._replay_mode() and len(self._replay_inputs) < self._hparams.batch_size
+
+  def _consolidation_mode(self):
+    return len(self._replay_inputs) >= self._hparams.batch_size
+
+  def _setup_train_feed_dict(self, batch_type, training_handle):
+    feed_dict = super()._setup_train_feed_dict(batch_type, training_handle)
+
+    if self._consolidation_mode():
+      print('Consolidating memories...')
+
+      assert len(self._replay_inputs) == len(self._replay_labels)
+
+      size = len(self._replay_inputs)
+      idx = np.random.choice(np.arange(size), self._hparams.batch_size, replace=False)
+
+      if not isinstance(self._replay_inputs, np.ndarray):
+        self._replay_inputs = np.array(self._replay_inputs)
+        self._replay_labels = np.array(self._replay_labels)
+
+        self._replay_inputs = (self._replay_inputs - np.min(self._replay_inputs)) / (
+            np.max(self._replay_inputs) - np.min(self._replay_inputs))
+
+      batch_inputs = self._replay_inputs[idx]
+      batch_labels = self._replay_labels[idx]
+
+      feed_dict.update({
+          self._component.get_dual().get_pl('replay'): True,
+
+          self._component.get_dual().get_pl('replay_inputs'): batch_inputs,
+          self._component.get_dual().get_pl('replay_labels'): batch_labels
+      })
+
+    return feed_dict
+
   def training(self, training_handle, training_step, training_fetches=None):
     """The training procedure within the batch loop"""
 
+    # If we're in replay mode, and this is the first step of the run, then build the replay dataset first
+    if self._build_replay_dataset(training_step):
+      print('Building Replay Dataset...')
+
+      print('# samples', len(self._replay_inputs))
+
+      fetched = {}
+      batch_type = self._setup_train_batch_types()
+      feed_dict = self._setup_train_feed_dict(batch_type, training_handle)
+
+      # Trigger the iterator since we're skipping a training step
+      training_fetches = ({'labels': self._labels})
+      self._session.run(training_fetches, feed_dict)
+
+      # TODO: Reset LTM back to checkpoint here
+
+      return feed_dict, fetched
+
     # re-initialise variables if we're starting a new run
-    if self._is_eval_batch(training_step-1):  # previous step was an 'evaluation' step
+    if self._is_eval_batch(training_step - 1) and not self._replay_mode():  # previous step was an 'evaluation' step
       self._reinitialize_networks()
 
     self._training_features = {}
@@ -332,13 +397,16 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     # --------------------------------------------------------------
     losses = {}
 
+    if self._replay_mode():
+      print('Replay - Eval Step #', test_step)
+
     target_inputs, testing_feed_dict = self._get_target_switch_to_test(feed_dict, training_handle, test_handle)
     testing_feed_dict = self._set_degrade_options(testing_feed_dict)
 
     # Don't bother recursions in Hopfield while we're learning the 'fc network' to map VC to PC
     # Note: we still need to do this 'evaluation' step
 
-    if self._is_eval_batch(test_step):
+    if self._is_eval_batch(test_step) or self._build_replay_dataset(test_step):
       self._opts['test_recurse'] = self._test_recurse_opts
     else:
       self._opts['test_recurse'] = False
@@ -353,11 +421,58 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         }
     )
 
+    if self._build_replay_dataset(test_step):
+      input_shape = self._component.get_pc().get_dual().get_pl('replay_input').get_shape().as_list()
+
+      # mu, sigma = 0.0, 0.01
+      input_noise = np.random.normal(size=input_shape)
+
+      print('replay_noise', input_shape, np.min(input_noise), np.max(input_noise))
+
+      testing_feed_dict.update({
+          self._component.get_pc().get_dual().get_pl('replay'): True,
+          self._component.get_ll_pc().get_dual().get_pl('replay'): True,
+          self._component.get_pc().get_dual().get_pl('replay_input'): input_noise
+      })
+
     logging.debug("**********>> Testing: Batch={}".format(test_step))
     testing_fetched = self._inference(test_step, testing_feed_dict, testing_fetches)
 
     self._testing_features = self._extract_features(testing_fetched)
     self._test_inputs = testing_fetched['test_inputs']
+
+    if self._build_replay_dataset(test_step):
+      replay_inputs = np.reshape(testing_fetched['pc']['ec_out_raw'], self._dataset.shape)
+      replay_labels = testing_fetched['ll_pc']['preds']
+
+      threshold = 100
+
+      for i, (image, label) in enumerate(zip(replay_inputs, replay_labels)):
+        image = np.squeeze(image, axis=2)
+
+        if np.sum(image) > threshold:
+
+          print('Sample # =', i, 'Label = ', np.max(label), np.argmax(label))
+
+          self._replay_inputs.append(replay_inputs[i])
+          self._replay_labels.append(replay_labels[i])
+
+      if len(self._replay_inputs) >= 1:
+        import os
+        import matplotlib.pyplot as plt
+        plt.switch_backend('agg')
+
+        print('DEBUG: Exporting recalled images...')
+
+        for i, image in enumerate(self._replay_inputs):
+          image = np.squeeze(image, axis=2)
+
+          plt.imshow(image, cmap='binary', vmin=0, vmax=1)
+
+          filetype = 'png'
+          filename = 'recalled_' + str(i) + '.' + filetype
+          filepath = os.path.join(self._summary_dir, filename)
+          plt.savefig(filepath, dpi=300, format=filetype)
 
     logging.debug("          --------> Batch={},  Testing labels = {}".format(test_step, self._testing_features['labels'][0]))
 
