@@ -178,7 +178,7 @@
 
     "train_recurse": false,
     "test_recurse": true,
-    "recurse_iterations": 70,
+    "recurse_iterations": 140,
     "rsummary_batches": 0,
     "visualise_vc": false,
     "visualise_if_at_vc": false,
