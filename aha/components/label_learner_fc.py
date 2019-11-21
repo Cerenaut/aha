@@ -72,18 +72,6 @@ class LabelLearnerFC(SummaryComponent):
       # ------------------------------------
       self._batch_type = tf.placeholder_with_default(input='training', shape=[], name='batch_type')
 
-      replay_pl = self._dual.add('replay', shape=[], default_value=False).add_pl(
-          default=True, dtype=tf.bool)
-
-      train_input_pl = self._dual.add('replay_train_input', shape=train_input.shape, default_value=0.0).add_pl(
-          default=True, dtype=train_input.dtype)
-
-      test_input_pl = self._dual.add('replay_test_input', shape=test_input.shape, default_value=0.0).add_pl(
-          default=True, dtype=test_input.dtype)
-
-      target_output_pl = self._dual.add('replay_target_output', shape=target_output.shape, default_value=0.0).add_pl(
-          default=True, dtype=target_output.dtype)
-
       # 0) nn params
       # ------------------------------------
       non_linearity = self._hparams.non_linearity
@@ -91,19 +79,6 @@ class LabelLearnerFC(SummaryComponent):
 
       # 1) organise inputs to network
       # ------------------------------------
-
-      # Alternative input pathway during replay
-      train_input = tf.cond(tf.equal(replay_pl, True),
-                            lambda: train_input_pl,
-                            lambda: train_input)
-
-      test_input = tf.cond(tf.equal(replay_pl, True),
-                           lambda: test_input_pl,
-                           lambda: test_input)
-
-      target_output = tf.cond(tf.equal(replay_pl, True),
-                              lambda: target_output_pl,
-                              lambda: target_output)
 
       # Switch inputs based on the batch type
       x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
