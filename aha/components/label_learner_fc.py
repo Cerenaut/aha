@@ -67,7 +67,22 @@ class LabelLearnerFC(SummaryComponent):
     self._hparams = hparams
 
     with tf.variable_scope(self.name):
+
+      # Setup placeholders
+      # ------------------------------------
       self._batch_type = tf.placeholder_with_default(input='training', shape=[], name='batch_type')
+
+      replay_pl = self._dual.add('replay', shape=[], default_value=False).add_pl(
+          default=True, dtype=tf.bool)
+
+      train_input_pl = self._dual.add('replay_train_input', shape=train_input.shape, default_value=0.0).add_pl(
+          default=True, dtype=train_input.dtype)
+
+      test_input_pl = self._dual.add('replay_test_input', shape=test_input.shape, default_value=0.0).add_pl(
+          default=True, dtype=test_input.dtype)
+
+      target_output_pl = self._dual.add('replay_target_output', shape=target_output.shape, default_value=0.0).add_pl(
+          default=True, dtype=target_output.dtype)
 
       # 0) nn params
       # ------------------------------------
@@ -76,13 +91,28 @@ class LabelLearnerFC(SummaryComponent):
 
       # 1) organise inputs to network
       # ------------------------------------
-      self._dual.set_op('target_output', target_output)
-      t_nn_shape = target_output.get_shape().as_list()
-      t_nn_size = np.prod(t_nn_shape[1:])
 
+      # Alternative input pathway during replay
+      train_input = tf.cond(tf.equal(replay_pl, True),
+                            lambda: train_input_pl,
+                            lambda: train_input)
+
+      test_input = tf.cond(tf.equal(replay_pl, True),
+                           lambda: test_input_pl,
+                           lambda: test_input)
+
+      target_output = tf.cond(tf.equal(replay_pl, True),
+                              lambda: target_output_pl,
+                              lambda: target_output)
+
+      # Switch inputs based on the batch type
       x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
                      lambda: train_input,
                      lambda: test_input)
+
+      self._dual.set_op('target_output', target_output)
+      t_nn_shape = target_output.get_shape().as_list()
+      t_nn_size = np.prod(t_nn_shape[1:])
 
       x_nn = tf.layers.flatten(x_nn)
 
@@ -226,7 +256,7 @@ class LabelLearnerFC(SummaryComponent):
 
   def add_fetches(self, fetches, batch_type='training'):
     """Adds ops that will get evaluated."""
-    names = ['loss', 'accuracy', 'accuracy_unseen']
+    names = ['loss', 'preds', 'accuracy', 'accuracy_unseen']
 
     if batch_type == 'training':
       names.extend(['training_ll'])

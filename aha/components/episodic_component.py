@@ -489,40 +489,71 @@ class EpisodicComponent(CompositeComponent):
     self._input_shape = input_shape
     self._label_values = label_values
 
-    self.set_signal('input', input_values, input_shape)
-
     input_area = np.prod(input_shape[1:])
 
     logging.debug('Input Shape: %s', input_shape)
     logging.debug('Input Area: %s', input_area)
 
     with tf.variable_scope(self._name, reuse=tf.AUTO_REUSE):
+
+      # Replay mode
+      # ------------------------------------------------------------------------
+      replay = self._dual.add('replay', shape=[], default_value=False).add_pl(
+          default=True, dtype=tf.bool)
+
+      replay_inputs = self._dual.add('replay_inputs', shape=input_values.shape, default_value=0.0).add_pl(
+          default=True, dtype=input_values.dtype)
+
+      replay_labels = self._dual.add('replay_labels', shape=label_values.shape, default_value=0.0).add_pl(
+          default=True, dtype=label_values.dtype)
+
+      # Switch input and label values during replay
+      self._input_values = tf.cond(tf.equal(replay, True),
+                                   lambda: replay_inputs,
+                                   lambda: self._input_values)
+
+      self._label_values = tf.cond(tf.equal(replay, True),
+                                   lambda: replay_labels,
+                                   lambda: self._label_values)
+
+      self.set_signal('input', self._input_values, self._input_shape)
+
+      # Build the LTM
+      # ------------------------------------------------------------------------
+
       # Optionally degrade input to VC
       degrade_step_pl = self._dual.add('degrade_step', shape=[],  # e.g. hidden, input, none
                                        default_value='none').add_pl(default=True, dtype=tf.string)
       degrade_random_pl = self._dual.add('degrade_random', shape=[],
                                          default_value=0.0).add_pl(default=True, dtype=tf.float32)
-      input_values = self.degrader(degrade_step_pl, self._degrade_type, degrade_random_pl, input_values,
+      input_values = self.degrader(degrade_step_pl, self._degrade_type, degrade_random_pl, self._input_values,
                                    degrade_step='input', name='vc_input_values')
 
       print('vc', 'input', input_values)
       self.set_signal('vc_input', input_values, input_shape)
 
+      # Build the VC
       input_next, input_next_vis_shape = self._build_vc(input_values, input_shape)
 
       vc_encoding = input_next
       self.set_signal('vc', vc_encoding, input_next_vis_shape)
       self._dual.set_op('vc_encoding', vc_encoding)
 
+      # Build the softmax classifier
       if self.is_build_ll_vc() and self._label_values is not None:
         self._build_ll_vc(self._label_values, vc_encoding, vc_encoding)
 
+      # Build AHA
+      # ------------------------------------------------------------------------
+
+      # Build the DG
       dg_sparsity = 0
       if self.is_build_dg():
         input_next, input_next_vis_shape, dg_sparsity = self._build_dg(input_next, input_next_vis_shape)
         dg_encoding = input_next
         self.set_signal('dg', dg_encoding, input_next_vis_shape)
 
+      # Build the PC
       if self.is_build_pc():
         # Optionally degrade input to PC
 

@@ -101,7 +101,7 @@ def get_pc_topk_shift(tensor, sparsity):
   y_masked_min = 1.0 - y_inv_masked_max
 
   # convert this to tanh range
-  # cue_tanh_min:  -0.5 -0.1 0.0  0.1  0.5 
+  # cue_tanh_min:  -0.5 -0.1 0.0  0.1  0.5
   # 0-x            +0.5 +0.1 0.0 -0.1 -0.5
   # so e.g.
   #             -0.5 + 0.5 = 0
@@ -787,6 +787,12 @@ class HopfieldlikeComponent(Component):
     x_nn_shape = x_nn.get_shape().as_list()
     x_nn_size = np.prod(x_nn_shape[1:])
 
+    replay = self._dual.add('replay', shape=[], default_value=False).add_pl(default=True, dtype=tf.bool)
+    replay_input = self._dual.add('replay_input', shape=x_nn.shape, default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
+
+    # Swap 'x_nn' during replay
+    x_nn = tf.cond(tf.equal(replay, True), lambda: replay_input, lambda: x_nn)
+
     # 2) build the network
     # ------------------------------------
 
@@ -895,6 +901,9 @@ class HopfieldlikeComponent(Component):
     else:
       self._build_optimizer(loss, 'training_pr', scope='pr')
 
+    # Swap 'y' during replay
+    # y = tf.cond(tf.equal(replay, True), lambda: replay_input, lambda: y)
+
     self._dual.set_op('pr_probs', y)    # badly named for historical reasons
 
     if (last_layer == 'sigmoid_ce') or (last_layer == 'sigmoid_mse') or (last_layer == 'lrelu_mse'):  # New modes
@@ -903,7 +912,7 @@ class HopfieldlikeComponent(Component):
       # Clip
       y = tf.clip_by_value(y, 0.0, 1.0)
 
-      # Sparsen 
+      # Sparsen
       if self._hparams.cue_nn_sparsen is True:
         k_pr = int(sparsity * pr_sparsity_boost)
         logging.info('PR Sparsen enabled k=' + str(k_pr))
@@ -1384,7 +1393,8 @@ class HopfieldlikeComponent(Component):
     """Build summaries for retrieval."""
 
     # summarise_stuff = ['pm', 'pr', 'general']
-    summarise_stuff = ['pm']
+    # summarise_stuff = ['pm']
+    summarise_stuff = ['general']
 
     max_outputs = self._hparams.max_outputs
     summary_input_shape = image_utils.get_image_summary_shape(self._input_summary_shape)
