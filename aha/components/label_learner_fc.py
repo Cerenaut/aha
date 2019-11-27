@@ -158,7 +158,8 @@ class LabelLearnerFC(SummaryComponent):
       preds = self._dual.get_op('preds')
       labels = self._dual.get_op('target_output')
 
-      unseen_idxs = (0, 1)
+      unseen_sum = 1
+      unseen_idxs = (0, unseen_sum)
 
       correct_predictions = tf.equal(tf.argmax(preds, 1), tf.argmax(labels, 1))
       correct_predictions = tf.cast(correct_predictions, tf.float32)

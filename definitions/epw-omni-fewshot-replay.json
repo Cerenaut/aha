@@ -4,20 +4,20 @@
     "dataset": "aha.datasets.omniglot_unseen_oneshot_dataset",
     "component": "aha.components.episodic_component",
 
-    "checkpoint": "/home/incubator/agief-remote-run/aha/run/summaries_20191114-100941/model.ckpt-40",
+    "checkpoint": "/home/incubator/agief-remote-run/aha/run/summaries_20191125-153540/model.ckpt-40",
     "checkpoint_load_scope": "episodic/vc, episodic/pc, episodic/ll_pc, episodic/ll_vc",
     "checkpoint_frozen_scope": "episodic/vc, episodic/dg, episodic/pc, episodic/ll_pc",
 
     "logging": "info",
     "seed": 42,
-    "batches": 40,
+    "batches": 160,
 
     "summarize": true,
     "track": true,
     "tb_debug": false,
 
     "hparams_override": {
-      "batch_size": 32,
+      "batch_size": 20,
       "output_features": "dg",
       "pc_type": "hl",
       "dg_type": "fc",
@@ -34,7 +34,7 @@
       "max_outputs": 3,
 
       "vc_num_layers": 1,
-      "vc_batch_size": 32,
+      "vc_batch_size": 20,
       "vc_learning_rate": [0.001],
       "vc_sparsity": [4],
       "vc_sparsity_output_factor": [1.0],
@@ -52,11 +52,11 @@
       "vc_summarize_level": [1],
       "vc_max_outputs": [3],
 
-      "dg_stub_batch_size": 32,
+      "dg_stub_batch_size": 20,
       "dg_stub_sparsity": 10,
       "dg_stub_filters": 225,
 
-      "dg_fc_batch_size": 32,
+      "dg_fc_batch_size": 20,
       "dg_fc_learning_rate": 0.001,
       "dg_fc_inhibition_decay": 0.95,
       "dg_fc_knockout_rate": 0.25,
@@ -71,7 +71,7 @@
       "dg_fc_summarize_level": 1,
       "dg_fc_max_outputs": 3,
 
-      "dg_conv_batch_size": 32,
+      "dg_conv_batch_size": 20,
       "dg_conv_learning_rate": 0.001,
       "dg_conv_sparsity": 2,
       "dg_conv_sparsity_output_factor": 1.0,
@@ -84,7 +84,7 @@
       "dg_conv_decoder_nonlinearity": "sigmoid",
       "dg_conv_max_outputs": 3,
 
-      "pc_hl_batch_size": 32,
+      "pc_hl_batch_size": 20,
       "pc_hl_learning_rate": 0.01,
       "pc_hl_use_feedback": true,
       "pc_hl_memorise_method": "pinv",
@@ -92,7 +92,7 @@
       "pc_hl_update_n_neurons": 20,
       "pc_hl_gain": 2.7,
       "pc_hl_pr_type": "nn",
-      "pc_hl_pm_type": "none",
+      "pc_hl_pm_type": "nn",
       "pc_hl_pm_raw_type": "nn",
 
       "pc_hl_pm_l1_size": 100,
@@ -120,7 +120,7 @@
       "pc_hl_summarize_level": 0,
       "pc_hl_max_outputs": 5,
 
-      "ifi_batch_size": 32,
+      "ifi_batch_size": 20,
       "ifi_num_features": 15,
       "ifi_scale_range": [1.0],
       "ifi_pe_size": 15,
@@ -133,14 +133,14 @@
       "ifi_summarize_level": 1,
       "ifi_max_outputs": 3,
 
-      "ll_vc_batch_size": 32,
+      "ll_vc_batch_size": 20,
       "ll_vc_hidden_size": 0,
       "ll_vc_learning_rate": 0.001,
       "ll_vc_l2_regularizer": 0.0,
       "ll_vc_train_input_dropout_keep_prob": 1.0,
       "ll_vc_train_hidden_dropout_keep_prob": 1.0,
 
-      "ll_pc_batch_size": 32,
+      "ll_pc_batch_size": 20,
       "ll_pc_hidden_size": 800,
       "ll_pc_learning_rate": 0.01,
       "ll_pc_l2_regularizer": 0.000025,
@@ -156,7 +156,8 @@
     "export_filters": false
   },
   "workflow-options": {
-    "num_repeats": 40,
+    "num_repeats": 160,
+    "num_replays": 1,
     "evaluate": true,
     "invert_images": false,
     "resize_images_factor": 0.5,
@@ -178,11 +179,11 @@
 
     "train_recurse": false,
     "test_recurse": true,
-    "recurse_iterations": 140,
+    "recurse_iterations": 70,
     "rsummary_batches": 0,
     "visualise_vc": false,
     "visualise_if_at_vc": false,
-    "evaluate_mode": ["replay"],
+    "evaluate_mode": ["oneshot"],
     "evaluate_supermode": "none",
     "summarize_completion": "to_file"
   }
