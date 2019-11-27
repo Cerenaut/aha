@@ -498,23 +498,22 @@ class EpisodicComponent(CompositeComponent):
 
       # Replay mode
       # ------------------------------------------------------------------------
+      replay_mode = 'pixel'   # pixel or encoding
       replay = self._dual.add('replay', shape=[], default_value=False).add_pl(
           default=True, dtype=tf.bool)
 
-      replay_inputs = self._dual.add('replay_inputs', shape=input_values.shape, default_value=0.0).add_pl(
-          default=True, dtype=input_values.dtype)
-
+      # Replace labels during replay
       replay_labels = self._dual.add('replay_labels', shape=label_values.shape, default_value=0.0).add_pl(
           default=True, dtype=label_values.dtype)
 
-      # Switch input and label values during replay
-      self._input_values = tf.cond(tf.equal(replay, True),
-                                   lambda: replay_inputs,
-                                   lambda: self._input_values)
+      self._label_values = tf.cond(tf.equal(replay, True), lambda: replay_labels, lambda: self._label_values)
 
-      self._label_values = tf.cond(tf.equal(replay, True),
-                                   lambda: replay_labels,
-                                   lambda: self._label_values)
+      # Replay pixel inputs during replay, if using 'pixel' replay mode
+      if replay_mode == 'pixel':
+        replay_inputs = self._dual.add('replay_inputs', shape=input_values.shape, default_value=0.0).add_pl(
+            default=True, dtype=input_values.dtype)
+
+        self._input_values = tf.cond(tf.equal(replay, True), lambda: replay_inputs, lambda: self._input_values)
 
       self.set_signal('input', self._input_values, self._input_shape)
 
@@ -536,6 +535,14 @@ class EpisodicComponent(CompositeComponent):
       input_next, input_next_vis_shape = self._build_vc(input_values, input_shape)
 
       vc_encoding = input_next
+
+      # Replace the encoding during replay, if using 'encoding' replay mode
+      if replay_mode == 'encoding':
+        replay_inputs = self._dual.add('replay_inputs', shape=vc_encoding.shape, default_value=0.0).add_pl(
+            default=True, dtype=vc_encoding.dtype)
+
+        vc_encoding = tf.cond(tf.equal(replay, True), lambda: replay_inputs, lambda: vc_encoding)
+
       self.set_signal('vc', vc_encoding, input_next_vis_shape)
       self._dual.set_op('vc_encoding', vc_encoding)
 
