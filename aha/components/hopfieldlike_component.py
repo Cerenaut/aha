@@ -30,7 +30,7 @@ from pagi.utils.layer_utils import activation_fn, type_activation_fn
 from pagi.components.component import Component
 from pagi.components.summarize_levels import SummarizeLevels
 
-from aha.utils.generic_utils import build_kernel_initializer
+from aha.utils.generic_utils import build_kernel_initializer, normalize_minmax, print_minmax
 
 ########################################################################################
 
@@ -606,12 +606,9 @@ class HopfieldlikeComponent(Component):
   def _build_pm(self):
     """Preprocess the inputs and build the pattern mapping components."""
 
-    def normalize(x):
-      return (x - tf.reduce_min(x)) / (tf.reduce_max(x) - tf.reduce_min(x))
-
     # map to input
     pc_out = self._dual.get_op('y')  # output of Hopfield (PC)
-    pc_out = normalize(pc_out)
+    pc_out = normalize_minmax(pc_out)
 
     pc_target = self._dual.get_op('pr_target')
 
@@ -787,11 +784,11 @@ class HopfieldlikeComponent(Component):
     x_nn_shape = x_nn.get_shape().as_list()
     x_nn_size = np.prod(x_nn_shape[1:])
 
-    replay = self._dual.add('replay', shape=[], default_value=False).add_pl(default=True, dtype=tf.bool)
-    replay_input = self._dual.add('replay_input', shape=x_nn.shape, default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
+    random_recall = self._dual.add('random_recall', shape=[], default_value=False).add_pl(default=True, dtype=tf.bool)
+    random_cue = self._dual.add('random_cue', shape=x_nn.shape, default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
 
-    # Swap 'x_nn' during replay
-    x_nn = tf.cond(tf.equal(replay, True), lambda: replay_input, lambda: x_nn)
+    # Swap 'x_nn' during random recall
+    x_nn = tf.cond(tf.equal(random_recall, True), lambda: random_cue, lambda: x_nn)
 
     # 2) build the network
     # ------------------------------------
@@ -1273,8 +1270,10 @@ class HopfieldlikeComponent(Component):
       if self.use_pm:
         ec_in = self._input_cue
         ec_out = self._dual.get_op('ec_out')
-        ec_recon = image_utils.concat_images([ec_in, ec_out], self._hparams.batch_size, images_shape=ec_recon_shape)
+        ec_recon = image_utils.concat_images([ec_in, ec_out], self._hparams.batch_size)
         summaries.append(tf.summary.image('ec_recon', ec_recon, max_outputs=max_outputs))
+
+
 
         # visualise losses
         pm_loss = self._dual.get_op('pm_loss')
