@@ -33,6 +33,8 @@ from pagi.utils import image_utils, generic_utils
 from pagi.utils.dual import DualData
 from pagi.utils.hparam_multi import HParamMulti
 from pagi.utils.layer_utils import type_activation_fn
+from pagi.utils.np_utils import np_uniform
+from pagi.utils.tf_utils import tf_build_interpolate_distributions
 
 from pagi.components.summarize_levels import SummarizeLevels
 from pagi.components.composite_component import CompositeComponent
@@ -199,6 +201,10 @@ class EpisodicComponent(CompositeComponent):
 
   def is_build_ll_pc(self):
     return self._hparams.ll_pc_type != 'none'
+
+  def is_build_ll_ensemble(self):
+    build_ll_ensemble = True
+    return self.is_build_ll_vc() and self.is_build_ll_pc() and build_ll_ensemble
 
   def is_build_pc(self):
     return self._hparams.pc_type != 'none'
@@ -469,6 +475,47 @@ class EpisodicComponent(CompositeComponent):
 
     return pc_output, pc_output_shape
 
+  def _build_ll_ensemble(self):
+    """Builds ensemble of VC and PC classifiers."""
+    distributions = []
+    distribution_mass = []
+    num_classes = self._label_values.get_shape().as_list()[-1]
+
+    aha_mass = 0.495
+    ltm_mass = 0.495
+    uniform_mass = 0.01
+
+    if aha_mass > 0.0:
+      aha_prediction = self.get_ll_pc().get_op('preds')
+      distributions.append(aha_prediction)
+      distribution_mass.append(aha_mass)
+
+    if ltm_mass > 0.0:
+      ltm_prediction = self.get_ll_vc().get_op('preds')
+      distributions.append(ltm_prediction)
+      distribution_mass.append(ltm_mass)
+
+    if uniform_mass > 0.0:
+      uniform = np_uniform(num_classes)
+      distributions.append(uniform)
+      distribution_mass.append(uniform_mass)
+
+    unseen_sum = 1
+    unseen_idxs = (0, unseen_sum)
+
+    # Build the final distribution, calculate loss
+    ensemble_preds = tf_build_interpolate_distributions(distributions, distribution_mass, num_classes)
+
+    ensemble_correct_preds = tf.equal(tf.argmax(ensemble_preds, 1), tf.argmax(self._label_values, 1))
+    ensemble_correct_preds = tf.cast(ensemble_correct_preds, tf.float32)
+
+    ensemble_accuracy = tf.reduce_mean(ensemble_correct_preds)
+    ensemble_accuracy_unseen = tf.reduce_mean(ensemble_correct_preds[unseen_idxs[0]:unseen_idxs[1]])
+
+    self._dual.set_op('ensemble_preds', ensemble_preds)
+    self._dual.set_op('ensemble_accuracy', ensemble_accuracy)
+    self._dual.set_op('ensemble_accuracy_unseen', ensemble_accuracy_unseen)
+
   def build(self, input_values, input_shape, hparams, label_values=None, name='episodic'):
     """Initializes the model parameters.
 
@@ -581,6 +628,9 @@ class EpisodicComponent(CompositeComponent):
         if self.is_build_ll_pc() and self.is_build_dg() and self._label_values is not None:
           self._build_ll_pc(self._label_values, dg_encoding, pc_output)
 
+      if self.is_build_ll_ensemble():
+        self._build_ll_ensemble()
+
     self.reset()
 
   def get_vc(self):
@@ -668,8 +718,13 @@ class EpisodicComponent(CompositeComponent):
     # ------------------------------
     # Interest Filter and other
     names = []
+
     if self._hparams.use_interest_filter:
-      names = ['masked_encodings', 'positional_encodings']
+      names.extend(['masked_encodings', 'positional_encodings'])
+
+    if self.is_build_ll_ensemble():
+      names.extend(['ensemble_preds', 'ensemble_accuracy', 'ensemble_accuracy_unseen'])
+
     # Other
     names.extend(['vc_encoding'])
 
@@ -693,8 +748,12 @@ class EpisodicComponent(CompositeComponent):
     # ----------------------------
     # Interest Filter
     names = []
+
     if self._hparams.use_interest_filter:
-      names = ['masked_encodings', 'positional_encodings']
+      names.extend(['masked_encodings', 'positional_encodings'])
+
+    if self.is_build_ll_ensemble():
+      names.extend(['ensemble_preds', 'ensemble_accuracy', 'ensemble_accuracy_unseen'])
 
     # other
     names.extend(['vc_encoding'])

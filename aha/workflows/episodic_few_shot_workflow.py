@@ -148,6 +148,8 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     self._replay_labels = []
     self._replay_step = 0
 
+    self._replay_inh = None
+
     self._all_replay_inputs = []
     self._all_replay_labels = []
 
@@ -491,11 +493,12 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     self._test_inputs = testing_fetched['test_inputs']
 
     if self._build_replay_dataset():
-      vc_encoding, _ = self._component.get_signal('vc')
-      replay_shape = vc_encoding.get_shape().as_list()
-      replay_images = np.reshape(testing_fetched['pc']['ec_out_raw'], self._dataset.shape)
+      # vc_encoding, _ = self._component.get_signal('vc')
+      # replay_shape = vc_encoding.get_shape().as_list()
       # replay_inputs = np.reshape(testing_fetched['pc']['ec_out'], replay_shape)
-      replay_inputs = replay_images
+
+      replay_inputs = np.reshape(testing_fetched['pc']['ec_out_raw'], self._dataset.shape)
+
       replay_labels = testing_fetched['ll_pc']['preds']
 
       for i, (image, label) in enumerate(zip(replay_inputs, replay_labels)):
@@ -542,7 +545,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         plt.imshow(image, cmap='binary', vmin=0, vmax=1)
 
         filetype = 'png'
-        filename = 'replay_' + str(i) + '_' + str(label_real) + '.' + filetype
+        filename = str(self._replay_step) + '_replay_' + str(i) + '_' + str(label_real) + '.' + filetype
         filepath = os.path.join(self._summary_dir, filename)
         plt.savefig(filepath, dpi=300, format=filetype)
 
@@ -664,6 +667,13 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
         self._report_average_metric('ll_pc_accuracy', losses['ll_pc_accuracy'])
         self._report_average_metric('ll_pc_accuracy_unseen', losses['ll_pc_accuracy_unseen'])
+
+      if self._component.is_build_ll_ensemble():
+        losses['ll_ensemble_accuracy'] = self._component.get_values('ensemble_accuracy')
+        losses['ll_ensemble_accuracy_unseen'] = self._component.get_values('ensemble_accuracy_unseen')
+
+        self._report_average_metric('ll_ensemble_accuracy', losses['ll_ensemble_accuracy'])
+        self._report_average_metric('ll_ensemble_accuracy_unseen', losses['ll_ensemble_accuracy_unseen'])
 
       modes = self._opts['evaluate_mode']
       self._compute_few_shot_metrics(losses, modes, pc_in, pc_completion, pc_at_dg, pc_at_vc)
