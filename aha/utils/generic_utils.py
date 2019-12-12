@@ -25,7 +25,7 @@ def normalize_minmax(inputs):
 
 
 def print_minmax(tensor, name):
-  return tf.Print(tensor, [tf.reduce_min(tensor), tf.reduce_max(tensor)], str(name) + ' - min/max = ')
+  return tf.Print(tensor, [tf.reduce_min(tensor), tf.reduce_max(tensor), tf.reduce_sum(tensor)], str(name) + ' - min/max/sum = ')
 
 
 def build_kernel_initializer(init_type='he', uniform=False):

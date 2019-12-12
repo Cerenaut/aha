@@ -10,7 +10,7 @@
 
     "logging": "info",
     "seed": 42,
-    "batches": 160,
+    "batches": 40,
 
     "summarize": true,
     "track": true,
@@ -156,8 +156,8 @@
     "export_filters": false
   },
   "workflow-options": {
-    "num_repeats": 160,
-    "num_replays": 1,
+    "num_repeats": 40,
+    "num_replays": 5,
     "evaluate": true,
     "invert_images": false,
     "resize_images_factor": 0.5,
@@ -179,11 +179,11 @@
 
     "train_recurse": false,
     "test_recurse": true,
-    "recurse_iterations": 70,
+    "recurse_iterations": 140,
     "rsummary_batches": 0,
     "visualise_vc": false,
     "visualise_if_at_vc": false,
-    "evaluate_mode": ["oneshot"],
+    "evaluate_mode": ["replay"],
     "evaluate_supermode": "none",
     "summarize_completion": "to_file"
   }

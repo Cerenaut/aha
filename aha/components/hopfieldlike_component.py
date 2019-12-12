@@ -277,6 +277,10 @@ class HopfieldlikeComponent(Component):
   def use_pm_raw(self):
     return self._use_pm_raw
 
+  @property
+  def use_inhibition(self):
+    return True
+
   def get_loss(self):
     """Loss from memorisation of samples in fb weights """
     return self._dual.get_values('loss_memorise')
@@ -784,8 +788,25 @@ class HopfieldlikeComponent(Component):
     x_nn_shape = x_nn.get_shape().as_list()
     x_nn_size = np.prod(x_nn_shape[1:])
 
+    noise = tf.random_normal(shape=x_nn_shape, mean=0.0, stddev=0.1)
+    noise = tf.clip_by_value(noise, tf.reduce_min(x_nn), tf.reduce_max(x_nn))
+    # noise = print_minmax(noise, 'pr_noise')
+
     random_recall = self._dual.add('random_recall', shape=[], default_value=False).add_pl(default=True, dtype=tf.bool)
-    random_cue = self._dual.add('random_cue', shape=x_nn.shape, default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
+    # random_cue = self._dual.add('random_cue', shape=x_nn.shape, default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
+    inhibition = self._dual.add('inhibition', shape=x_nn.shape, default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
+    use_inhibition = self._dual.add('use_inhibition', shape=[], default_value=False).add_pl(default=True, dtype=tf.bool)
+    # inhibition = print_minmax(inhibition, 'inhibition')
+
+    if self.use_inhibition:
+      decay = 0.99
+      inhibiton_decay_op = decay * inhibition + (1 - inhibition) * x_nn
+      inhibition_decayed = tf.cond(tf.equal(use_inhibition, True), lambda: inhibiton_decay_op, lambda: tf.zeros_like(inhibition))
+      self._dual.set_op('inhibition', inhibition_decayed)
+
+    random_cue = noise - inhibition_decayed
+    # random_cue = print_minmax(random_cue, 'random_cue')
+    # x_nn = print_minmax(x_nn, 'x_nn')
 
     # Swap 'x_nn' during random recall
     x_nn = tf.cond(tf.equal(random_recall, True), lambda: random_cue, lambda: x_nn)
@@ -1125,9 +1146,15 @@ class HopfieldlikeComponent(Component):
   # ---------------- training
 
   def update_training_dict(self, feed_dict):
+    names = []
+    if self.use_inhibition:
+      names.extend(['inhibition'])
+    self._dual.update_feed_dict(feed_dict, names)
+
     feed_dict.update({
         self._batch_type: 'training'
     })
+
 
   def add_training_fetches(self, fetches):
 
@@ -1148,6 +1175,9 @@ class HopfieldlikeComponent(Component):
 
     if self._use_pm_raw:
       names.extend(['training_pm_raw', 'ec_out_raw'])
+
+    if self.use_inhibition:
+      names.extend(['inhibition'])
 
     # this needs to be done once, because it replaces the fetches, instead of adding to them
     self._dual.add_fetches(fetches, names)
@@ -1170,13 +1200,21 @@ class HopfieldlikeComponent(Component):
     if self._use_pm_raw:
       names.extend(['ec_out_raw'])
 
+    if self.use_inhibition:
+      names.extend(['inhibition'])
 
     self._dual.set_fetches(fetched, names)
 
 # ---------------- inference (encoding)
 
   def update_encoding_dict(self, feed_dict):
+    names = []
+    if self.use_inhibition:
+      names.extend(['inhibition'])
+    self._dual.update_feed_dict(feed_dict, names)
+
     self._update_dict_fb(feed_dict)
+
     feed_dict.update({
         self._batch_type: 'encoding'
     })
@@ -1199,6 +1237,9 @@ class HopfieldlikeComponent(Component):
     if self._use_pm_raw:
       names.extend(['pm_loss_raw', 'ec_out_raw'])
 
+    if self.use_inhibition:
+      names.extend(['inhibition'])
+
     self._dual.add_fetches(fetches, names)
 
   def set_encoding_fetches(self, fetched):
@@ -1217,6 +1258,9 @@ class HopfieldlikeComponent(Component):
 
     if self._use_pm_raw:
       names.extend(['pm_loss_raw', 'ec_out_raw'])
+
+    if self.use_inhibition:
+      names.extend(['inhibition'])
 
     self._dual.set_fetches(fetched, names)
 

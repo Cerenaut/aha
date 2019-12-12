@@ -389,8 +389,8 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
       return feed_dict, fetched
 
     # re-initialise variables if we're starting a new run
-    # if self._is_eval_batch(training_step - 1) and not self._replay_mode():  # previous step was an 'evaluation' step
-    #   self._reinitialize_networks()
+    if self._is_eval_batch(training_step - 1) and not self._replay_mode():  # previous step was an 'evaluation' step
+      self._reinitialize_networks()
 
     self._training_features = {}
 
@@ -449,38 +449,40 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     )
 
     threshold = 100
-    use_threshold = False
-    big_loop = False
+    use_threshold = True
+    big_loop = True
     big_loop_done = False
-    random_recall = False
+    random_recall = True
 
     from pagi.utils.np_utils import np_noise_salt_and_pepper
 
     if self._build_replay_dataset():
+      vc_encoding, _ = self._component.get_signal('vc')
+      vc_encoding_shape = vc_encoding.get_shape().as_list()
+
       if big_loop and self._replay_inputs:
         print('Step =', test_step, '- Big Loop')
 
         batch_inputs, batch_labels = self._replay_preprocess(self._replay_inputs, self._replay_labels)
-        # batch_inputs = np_noise_salt_and_pepper(batch_inputs)
 
         testing_feed_dict.update({
             self._component.get_dual().get_pl('replay'): True,
-            self._component.get_pc().get_dual().get_pl('random_recall'): False,
+            self._component.get_pc().get_dual().get_pl('random_recall'): True,
+            self._component.get_pc().get_dual().get_pl('use_inhibition'): True,
             self._component.get_dual().get_pl('replay_inputs'): batch_inputs,
             self._component.get_dual().get_pl('replay_labels'): batch_labels
         })
 
         big_loop_done = True
       elif random_recall:
-        random_cue_shape = self._component.get_pc().get_dual().get_pl('random_cue').get_shape().as_list()
-        random_noise = np.random.normal(size=random_cue_shape)
+        inhibition = np.zeros(vc_encoding_shape)
 
         print('Step =', test_step, '- Random Recall')
-        print('Random noise (cue) =', random_cue_shape, np.min(random_noise), np.max(random_noise))
 
         testing_feed_dict.update({
             self._component.get_pc().get_dual().get_pl('random_recall'): True,
-            self._component.get_pc().get_dual().get_pl('random_cue'): random_noise
+            self._component.get_pc().get_dual().get_pl('use_inhibition'): False,
+            self._component.get_pc().get_dual().get_pl('inhibition'): inhibition
         })
 
       self._replay_inputs = []
@@ -493,19 +495,18 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     self._test_inputs = testing_fetched['test_inputs']
 
     if self._build_replay_dataset():
-      # vc_encoding, _ = self._component.get_signal('vc')
-      # replay_shape = vc_encoding.get_shape().as_list()
+
       # replay_inputs = np.reshape(testing_fetched['pc']['ec_out'], replay_shape)
 
       replay_inputs = np.reshape(testing_fetched['pc']['ec_out_raw'], self._dataset.shape)
+      replay_images = replay_inputs
 
       replay_labels = testing_fetched['ll_pc']['preds']
 
       for i, (image, label) in enumerate(zip(replay_inputs, replay_labels)):
+        append = False
 
         if use_threshold and np.sum(image) > threshold:
-          append = False
-
           # If not in big loop, always append
           if not big_loop:
             append = True
