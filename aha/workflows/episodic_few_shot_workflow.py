@@ -338,7 +338,27 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
       assert len(self._all_replay_inputs) == len(self._all_replay_labels)
 
-      random_sample = False
+      import os
+      import matplotlib.pyplot as plt
+      plt.switch_backend('agg')
+
+      print('DEBUG: Exporting recalled images...')
+
+      for i, (image, label) in enumerate(zip(self._all_replay_inputs, self._all_replay_labels)):
+        image = np.squeeze(image, axis=2)
+        label_idx = np.argmax(label)
+
+        label_real = self._dataset.eval_classes[label_idx]
+
+        plt.imshow(image, cmap='binary', vmin=0, vmax=1)
+
+        filetype = 'png'
+        filename = 'final_' + str(i) + '_' + str(label_real) + '.' + filetype
+        filepath = os.path.join(self._summary_dir, filename)
+        plt.savefig(filepath, dpi=300, format=filetype)
+
+
+      random_sample = True
       if random_sample:
         size = len(self._all_replay_inputs)
         replay_inputs, replay_labels = self._replay_preprocess(self._all_replay_inputs, self._all_replay_labels)
@@ -350,6 +370,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
           idx = np.random.choice(np.arange(size), 1, replace=False)[0]
           batch_inputs.append(replay_inputs[idx])
           batch_labels.append(replay_labels[idx])
+
+        batch_inputs = np.array(batch_inputs)
+        batch_labels = np.array(batch_labels)
       else:
         batch_inputs = np.array(self._all_replay_inputs)
         batch_labels = np.array(self._all_replay_labels)
@@ -456,9 +479,19 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
     from pagi.utils.np_utils import np_noise_salt_and_pepper
 
+    print('# samples:', len(self._all_replay_inputs))
+
     if self._build_replay_dataset():
       vc_encoding, _ = self._component.get_signal('vc')
       vc_encoding_shape = vc_encoding.get_shape().as_list()
+
+      random_noise_shape = self._component.get_pc().get_dual().get_pl('random_noise').get_shape().as_list()
+
+      random_noise = np.random.uniform(-1, 1, random_noise_shape)
+      # random_noise = np_noise_salt_and_pepper(random_noise, rate=1.0)
+      # random_noise = np.random.normal(size=random_noise_shape)
+
+      print('Random noise =', random_noise_shape, np.min(random_noise), np.max(random_noise))
 
       if big_loop and self._replay_inputs:
         print('Step =', test_step, '- Big Loop')
@@ -469,6 +502,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
             self._component.get_dual().get_pl('replay'): True,
             self._component.get_pc().get_dual().get_pl('random_recall'): True,
             self._component.get_pc().get_dual().get_pl('use_inhibition'): True,
+            self._component.get_pc().get_dual().get_pl('random_noise'): random_noise,
             self._component.get_dual().get_pl('replay_inputs'): batch_inputs,
             self._component.get_dual().get_pl('replay_labels'): batch_labels
         })
@@ -482,6 +516,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         testing_feed_dict.update({
             self._component.get_pc().get_dual().get_pl('random_recall'): True,
             self._component.get_pc().get_dual().get_pl('use_inhibition'): False,
+            self._component.get_pc().get_dual().get_pl('random_noise'): random_noise,
             self._component.get_pc().get_dual().get_pl('inhibition'): inhibition
         })
 
@@ -495,9 +530,6 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     self._test_inputs = testing_fetched['test_inputs']
 
     if self._build_replay_dataset():
-
-      # replay_inputs = np.reshape(testing_fetched['pc']['ec_out'], replay_shape)
-
       replay_inputs = np.reshape(testing_fetched['pc']['ec_out_raw'], self._dataset.shape)
       replay_images = replay_inputs
 

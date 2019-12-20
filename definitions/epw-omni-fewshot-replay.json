@@ -157,7 +157,7 @@
   },
   "workflow-options": {
     "num_repeats": 40,
-    "num_replays": 5,
+    "num_replays": 10,
     "evaluate": true,
     "invert_images": false,
     "resize_images_factor": 0.5,

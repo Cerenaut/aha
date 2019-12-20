@@ -788,23 +788,24 @@ class HopfieldlikeComponent(Component):
     x_nn_shape = x_nn.get_shape().as_list()
     x_nn_size = np.prod(x_nn_shape[1:])
 
-    noise = tf.random_normal(shape=x_nn_shape)
-
     random_recall = self._dual.add('random_recall', shape=[], default_value=False).add_pl(default=True, dtype=tf.bool)
+    random_noise = self._dual.add('random_noise', shape=x_nn.shape, default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
     inhibition = self._dual.add('inhibition', shape=x_nn.shape, default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
     use_inhibition = self._dual.add('use_inhibition', shape=[], default_value=False).add_pl(default=True, dtype=tf.bool)
 
     if self.use_inhibition:
-      decay = 0.9
-      inhibiton_decay_op = decay * inhibition + (1 - decay) * x_nn
-      inhibition_decayed = tf.cond(tf.equal(use_inhibition, True), lambda: inhibiton_decay_op, lambda: tf.zeros_like(inhibition))
+      decay = 0.5
+      inhibition_decayed = decay * inhibition + (1 - decay) * x_nn
       self._dual.set_op('inhibition', inhibition_decayed)
 
-    random_cue = noise - inhibition_decayed
-    random_cue = tf.clip_by_value(random_cue, 0.0, tf.reduce_max(random_cue))
+    inhibition_noise = random_noise + inhibition_decayed
+
+    random_cue = tf.cond(tf.equal(use_inhibition, True), lambda: inhibition_noise, lambda: random_noise)
 
     # Swap 'x_nn' during random recall
     x_nn = tf.cond(tf.equal(random_recall, True), lambda: random_cue, lambda: x_nn)
+
+    x_nn = x_nn
 
     # 2) build the network
     # ------------------------------------
