@@ -40,7 +40,7 @@ from aha.workflows.pattern_completion_workflow import PatternCompletionWorkflow,
 
 from aha.utils.generic_utils import compute_overlap, overlap_sample_batch
 from aha.utils.few_shot_utils import compute_matching, create_and_add_comparison_image, add_completion_summary, \
-  add_completion_summary_paper
+  add_completion_summary_paper, mod_hausdorff_distance
 
 
 match_mse_key = 'match_mse'
@@ -477,6 +477,19 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
         self._report_average_metric('ll_pc_accuracy', losses['ll_pc_accuracy'])
         self._report_average_metric('ll_pc_accuracy_unseen', losses['ll_pc_accuracy_unseen'])
+
+      if self._component.get_pc().use_pm_raw is True:
+        vc_input = self._component.get_vc().get_inputs()
+        ec_out_raw = self._component.get_pc().get_ec_out_raw()
+
+        vc_input_flat = np.reshape(vc_input, [vc_input.shape[0], np.prod(vc_input.shape[1:])])
+        ec_out_raw_flat = np.reshape(ec_out_raw, [ec_out_raw.shape[0], np.prod(ec_out_raw.shape[1:])])
+
+        pm_raw_mse = np.square(vc_input_flat - ec_out_raw_flat).mean()
+        pm_raw_mhd = mod_hausdorff_distance(vc_input_flat, ec_out_raw_flat)
+
+        self._report_average_metric('acc_mse_pm_raw', pm_raw_mse)
+        self._report_average_metric('acc_mhd_pm_raw', pm_raw_mhd)
 
       modes = self._opts['evaluate_mode']
       self._compute_few_shot_metrics(losses, modes, pc_in, pc_completion, pc_at_dg, pc_at_vc)
