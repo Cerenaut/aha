@@ -488,6 +488,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         pm_raw_mse = np.square(vc_input_flat - ec_out_raw_flat).mean()
         pm_raw_mhd = mod_hausdorff_distance(vc_input_flat, ec_out_raw_flat)
 
+        losses['acc_mse_pm_raw'] = pm_raw_mse
+        losses['acc_mhd_pm_raw'] = pm_raw_mhd
+
         self._report_average_metric('acc_mse_pm_raw', pm_raw_mse)
         self._report_average_metric('acc_mhd_pm_raw', pm_raw_mhd)
 
