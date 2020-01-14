@@ -113,6 +113,7 @@ lc*.png
 data/
 MNIST-data/
 *.csv
+*.png
 
 # Generated images
 filters*.png

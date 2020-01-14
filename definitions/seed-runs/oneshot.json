@@ -4,7 +4,7 @@
     "dataset": "aha.datasets.omniglot_lake_runs_dataset",
     "component": "aha.components.episodic_component",
 
-    "checkpoint": "gs://project-agi-checkpoints/episodic/summaries_20190516-110659/model.ckpt-2000",
+    "checkpoint": "/home/incubator/agief-remote-run/storage/checkpoints/episodic/summaries_20190516-110659/model.ckpt-2000",
     "checkpoint_load_scope": "episodic/vc",
     "checkpoint_frozen_scope": "episodic/vc, episodic/dg",
 
@@ -148,12 +148,12 @@
     "batch_no_duplicates": false,
 
     "degrade_type": "circle",
-    "degrade_step": "test",
+    "degrade_step": "none",
     "degrade_factor": 0.0,
     "degrade_value": 0,
 
     "noise_type": "sp_float",
-    "noise_step": "none",
+    "noise_step": "test",
     "noise_factor": 0.0,
 
     "train_recurse": false,
