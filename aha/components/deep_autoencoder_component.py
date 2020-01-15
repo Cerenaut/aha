@@ -482,6 +482,9 @@ class DeepAutoencoderComponent(AutoencoderComponent):
   def get_ec_out_raw(self):
     return self._dual.get_values('ec_out_raw')
 
+  def get_batch_type(self):
+    return self._batch_type
+
   # SUMMARIES ------------------------------------------------------------------
   def write_filters(self, session, folder=None):
     pass
