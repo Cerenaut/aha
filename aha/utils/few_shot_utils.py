@@ -22,12 +22,29 @@ import os
 
 import numpy as np
 
-
-# go through samples in batch
 from sklearn import metrics
+from scipy.spatial.distance import cdist
 
 from pagi.utils import np_utils, image_utils
 from aha.utils.generic_utils import overlap_match
+
+
+def mod_hausdorff_distance(x, y):
+    # Modified Hausdorff Distance
+  #
+  # Input
+  #  x : [n x 2] coordinates of "inked" pixels
+  #  y : [m x 2] coordinates of "inked" pixels
+  #
+  #  M.-P. Dubuisson, A. K. Jain (1994). A modified hausdorff distance for object matching.
+  #  International Conference on Pattern Recognition, pp. 566-568.
+  #
+  dist = cdist(x, y)
+  mindist_x = dist.min(axis=1)
+  mindist_y = dist.min(axis=0)
+  mean_x = np.mean(mindist_x)
+  mean_y = np.mean(mindist_y)
+  return max(mean_x, mean_y)
 
 
 def add_completion_summary(summary_images, folder, summary, batch, save_figs):
