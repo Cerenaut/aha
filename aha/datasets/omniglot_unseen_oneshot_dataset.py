@@ -212,11 +212,11 @@ class OmniglotUnseenOneShotDataset(OmniglotUnseenDataset):
     self._dataset_show_files, self._dataset_show_labels = map(list, zip(*data_show))
     self._dataset_match_files, self._dataset_match_labels = map(list, zip(*data_match))
 
-    print('show_labels', self._dataset_show_labels, len(self._dataset_show_labels), '\n')
-    print('show_idx', data_show_idx, len(data_show_idx), '\n')
+    # print('show_labels', self._dataset_show_labels, len(self._dataset_show_labels), '\n')
+    # print('show_idx', data_show_idx, len(data_show_idx), '\n')
 
-    print('match_labels', self._dataset_match_labels, len(self._dataset_match_labels), '\n')
-    print('match_idx', data_match_idx, len(data_match_idx), '\n')
+    # print('match_labels', self._dataset_match_labels, len(self._dataset_match_labels), '\n')
+    # print('match_idx', data_match_idx, len(data_match_idx), '\n')
 
   def get_classes_by_superclass(self, superclasses, proportion=1.0):
     """
