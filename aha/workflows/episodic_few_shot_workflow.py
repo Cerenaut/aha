@@ -239,7 +239,6 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
     if self._replay_mode():
       test_recurse_iterations += self._opts['num_replays'] * self._opts['recurse_iterations']
-      print('total recursions:', test_recurse_iterations)
 
     train_dataset, test_dataset = self._gen_datasets_with_options(self._opts['train_classes'],
                                                                   self._opts['test_classes'],
@@ -479,51 +478,49 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
     from pagi.utils.np_utils import np_noise_salt_and_pepper
 
-    print('# samples:', len(self._all_replay_inputs))
+    # if self._build_replay_dataset():
+    #   vc_encoding, _ = self._component.get_signal('vc')
+    #   vc_encoding_shape = vc_encoding.get_shape().as_list()
 
-    if self._build_replay_dataset():
-      vc_encoding, _ = self._component.get_signal('vc')
-      vc_encoding_shape = vc_encoding.get_shape().as_list()
+    #   random_noise_shape = self._component.get_pc().get_dual().get_pl('random_noise').get_shape().as_list()
 
-      random_noise_shape = self._component.get_pc().get_dual().get_pl('random_noise').get_shape().as_list()
+    #   random_noise = np.random.uniform(-1, 1, random_noise_shape)
+    #   # random_noise = np_noise_salt_and_pepper(random_noise, rate=1.0)
+    #   # random_noise = np.random.normal(size=random_noise_shape)
 
-      random_noise = np.random.uniform(-1, 1, random_noise_shape)
-      # random_noise = np_noise_salt_and_pepper(random_noise, rate=1.0)
-      # random_noise = np.random.normal(size=random_noise_shape)
+    #   print('Random noise =', random_noise_shape, np.min(random_noise), np.max(random_noise))
 
-      print('Random noise =', random_noise_shape, np.min(random_noise), np.max(random_noise))
+    #   if big_loop and self._replay_inputs:
+    #     print('Step =', test_step, '- Big Loop')
 
-      if big_loop and self._replay_inputs:
-        print('Step =', test_step, '- Big Loop')
+    #     batch_inputs, batch_labels = self._replay_preprocess(self._replay_inputs, self._replay_labels)
 
-        batch_inputs, batch_labels = self._replay_preprocess(self._replay_inputs, self._replay_labels)
+    #     testing_feed_dict.update({
+    #         self._component.get_dual().get_pl('replay'): True,
+    #         self._component.get_pc().get_dual().get_pl('random_recall'): True,
+    #         self._component.get_pc().get_dual().get_pl('use_inhibition'): True,
+    #         self._component.get_pc().get_dual().get_pl('random_noise'): random_noise,
+    #         self._component.get_dual().get_pl('replay_inputs'): batch_inputs,
+    #         self._component.get_dual().get_pl('replay_labels'): batch_labels
+    #     })
 
-        testing_feed_dict.update({
-            self._component.get_dual().get_pl('replay'): True,
-            self._component.get_pc().get_dual().get_pl('random_recall'): True,
-            self._component.get_pc().get_dual().get_pl('use_inhibition'): True,
-            self._component.get_pc().get_dual().get_pl('random_noise'): random_noise,
-            self._component.get_dual().get_pl('replay_inputs'): batch_inputs,
-            self._component.get_dual().get_pl('replay_labels'): batch_labels
-        })
+    #     big_loop_done = True
+    #   elif random_recall:
+    #     inhibition = np.zeros(vc_encoding_shape)
 
-        big_loop_done = True
-      elif random_recall:
-        inhibition = np.zeros(vc_encoding_shape)
+    #     print('Step =', test_step, '- Random Recall')
 
-        print('Step =', test_step, '- Random Recall')
+    #     testing_feed_dict.update({
+    #         self._component.get_pc().get_dual().get_pl('random_recall'): True,
+    #         self._component.get_pc().get_dual().get_pl('use_inhibition'): False,
+    #         self._component.get_pc().get_dual().get_pl('random_noise'): random_noise,
+    #         self._component.get_pc().get_dual().get_pl('inhibition'): inhibition
+    #     })
 
-        testing_feed_dict.update({
-            self._component.get_pc().get_dual().get_pl('random_recall'): True,
-            self._component.get_pc().get_dual().get_pl('use_inhibition'): False,
-            self._component.get_pc().get_dual().get_pl('random_noise'): random_noise,
-            self._component.get_pc().get_dual().get_pl('inhibition'): inhibition
-        })
+    #   self._replay_inputs = []
+    #   self._replay_labels = []
 
-      self._replay_inputs = []
-      self._replay_labels = []
-
-    logging.debug("**********>> Testing: Batch={}".format(test_step))
+    logging.info("**********>> Testing: Batch={}".format(test_step))
     testing_fetched = self._inference(test_step, testing_feed_dict, testing_fetches)
 
     self._testing_features = self._extract_features(testing_fetched)
@@ -565,24 +562,49 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
       import os
       import matplotlib.pyplot as plt
-      plt.switch_backend('agg')
 
-      print('DEBUG: Exporting recalled images...')
+      rows = 4
+      cols = self._hparams.batch_size
+      _, ax = plt.subplots(nrows=rows, ncols=cols, figsize=[10, 2], num=test_step)
+      plt.subplots_adjust(left=0, right=1.0, bottom=0, top=1.0, hspace=0.1, wspace=0.1)
 
-      for i, (image, label) in enumerate(zip(replay_images, replay_labels)):
-        image = np.squeeze(image, axis=2)
-        label_idx = np.argmax(label)
+      # plot simple raster image on each sub-plot
+      for i, ax in enumerate(ax.flat):
+        # get indices of row/column
+        row_idx = i // cols
+        col_idx = i % cols
 
-        label_real = self._dataset.eval_classes[label_idx]
+        img_idx = col_idx
 
-        plt.imshow(image, cmap='binary', vmin=0, vmax=1)
+        if row_idx == 1:
+          label_idx = testing_fetched['labels'][img_idx]
+          label_real = self._dataset.eval_classes[label_idx]
+          ax.text(0.3, 0.3, str(label_real))
+        elif row_idx == 3:
+          label_idx = np.argmax(replay_labels[img_idx])
+          label_real = self._dataset.eval_classes[label_idx]
+          ax.text(0.3, 0.3, str(label_real))
+        else:
+          if row_idx == 0:
+            img = self._test_inputs[img_idx]
+          elif row_idx == 2:
+            img = replay_images[img_idx]
 
-        filetype = 'png'
-        filename = str(self._replay_step) + '_replay_' + str(i) + '_' + str(label_real) + '.' + filetype
-        filepath = os.path.join(self._summary_dir, filename)
-        plt.savefig(filepath, dpi=300, format=filetype)
+          image_shape = [replay_images.shape[1], replay_images.shape[2]]
+          img = np.reshape(img, image_shape)
+          ax.imshow(img, cmap='binary', vmin=0, vmax=1)
 
+        ax.axis('off')
+
+      filetype = 'png'
+      filename = 'replay_summary_' + str(test_step) + '.' + filetype
+      filepath = os.path.join('.', filename)
+      plt.savefig(filepath, bbox_inches='tight', pad_inches=0.2, dpi=300, format=filetype)
+
+    print(testing_feed_dict.keys())
     logging.debug("          --------> Batch={},  Testing labels = {}".format(test_step, self._testing_features['labels'][0]))
+
+    return losses
 
     if not self._is_eval_batch(test_step):
       return losses
@@ -707,7 +729,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
         self._report_average_metric('ll_ensemble_accuracy', losses['ll_ensemble_accuracy'])
         self._report_average_metric('ll_ensemble_accuracy_unseen', losses['ll_ensemble_accuracy_unseen'])
-        
+
       if self._component.get_pc().use_pm_raw is True:
         vc_input = self._component.get_vc().get_inputs()
         ec_out_raw = self._component.get_pc().get_ec_out_raw()
