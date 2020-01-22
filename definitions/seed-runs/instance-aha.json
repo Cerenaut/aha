@@ -1,0 +1,252 @@
+{
+  "experiment-options": {
+    "workflow": "aha.workflows.episodic_few_shot_workflow",
+    "dataset": "aha.datasets.omniglot_lake_dataset",
+    "component": "aha.components.episodic_component",
+
+    "checkpoint": "/home/incubator/agief-remote-run/storage/checkpoints/episodic/summaries_20190516-110659/model.ckpt-2000",
+    "checkpoint_load_scope": "episodic/vc",
+    "checkpoint_frozen_scope": "episodic/vc, episodic/dg",
+
+    "logging": "info",
+    "seed": 80,
+    "batches": 800,
+
+    "summarize": true,
+    "track": true,
+    "tb_debug": false,
+
+    "hparams_override": {
+      "batch_size": 20,
+      "output_features": "dg",
+      "pc_type": "hl",
+      "dg_type": "fc",
+      "use_cue_to_pc": true,
+      "use_pm": true,
+      "use_interest_filter": true,
+      "vc_norm_per_filter": false,
+      "vc_norm_per_sample": true,
+      "max_pool_vc_final_size": 4,
+      "max_pool_vc_final_stride": 4,
+      "summarize_level": 1,
+      "max_outputs": 3,
+
+      "vc_num_layers": 1,
+      "vc_batch_size": 20,
+      "vc_learning_rate": [0.001],
+      "vc_sparsity": [4],
+      "vc_sparsity_output_factor": [1.0],
+      "vc_filters": [121],
+      "vc_filters_field_width": [10],
+      "vc_filters_field_height": [10],
+      "vc_filters_field_stride": [1],
+      "vc_pool_size": [1],
+      "vc_pool_strides": [1],
+      "vc_use_unpooling": ["fixed"],
+      "vc_use_max_pool": ["none"],
+      "vc_secondary": [true],
+      "vc_encoder_nonlinearity": ["none"],
+      "vc_decoder_nonlinearity": ["none"],
+      "vc_summarize_level": [1],
+      "vc_max_outputs": [3],
+
+      "dg_stub_batch_size": 20,
+      "dg_stub_sparsity": 10,
+      "dg_stub_filters": 225,
+
+      "dg_fc_batch_size": 20,
+      "dg_fc_learning_rate": 0.001,
+      "dg_fc_inhibition_decay": 0.95,
+      "dg_fc_knockout_rate": 0.25,
+      "dg_fc_init_scale": 10.0,
+      "dg_fc_filters": 225,
+      "dg_fc_sparsity": 10,
+      "dg_fc_sparsity_output_factor": 1.0,
+      "dg_fc_use_bias": false,
+      "dg_fc_secondary": true,
+      "dg_fc_encoder_nonlinearity": "none",
+      "dg_fc_decoder_nonlinearity": "none",
+      "dg_fc_summarize_level": 1,
+      "dg_fc_max_outputs": 3,
+
+      "dg_conv_batch_size": 20,
+      "dg_conv_learning_rate": 0.001,
+      "dg_conv_sparsity": 2,
+      "dg_conv_sparsity_output_factor": 1.0,
+      "dg_conv_filters": 20,
+      "dg_conv_filters_field_width": 2,
+      "dg_conv_filters_field_height": 2,
+      "dg_conv_filters_field_stride": 1,
+      "dg_conv_secondary": true,
+      "dg_conv_encoder_nonlinearity": "sigmoid",
+      "dg_conv_decoder_nonlinearity": "sigmoid",
+      "dg_conv_max_outputs": 3,
+
+      "pc_hl_batch_size": 20,
+      "pc_hl_learning_rate": 0.01,
+      "pc_hl_use_feedback": true,
+      "pc_hl_memorise_method": "pinv",
+      "pc_hl_nonlinearity": "tanh",
+      "pc_hl_update_n_neurons": 20,
+      "pc_hl_gain": 2.7,
+      "pc_hl_pr_type": "nn",
+      "pc_hl_pm_type": "none",
+      "pc_hl_pm_raw_type": "nn",
+
+      "pc_hl_pm_l1_size": 100,
+      "pc_hl_pm_raw_l1_size": 100,
+      "pc_hl_pm_raw_l2_regularizer": 0.00004,
+      "pc_hl_pm_raw_nonlinearity": "leaky_relu",
+      "pc_hl_pm_noise_type": "s",
+      "pc_hl_pm_train_with_noise": 0.0,
+      "pc_hl_pm_train_with_noise_pp": 0.0,
+
+      "pc_hl_cue_nn_train_dropout_keep_prob": 0.75,
+      "pc_hl_cue_nn_train_with_noise": 0.05,
+      "pc_hl_cue_nn_train_with_noise_pp": 0.005,
+      "pc_hl_cue_nn_test_with_noise": 0.0,
+      "pc_hl_cue_nn_test_with_noise_pp": 0.0,
+      "pc_hl_cue_nn_hidden_size": 800,
+      "pc_hl_cue_nn_sparsity_boost": 1.5,
+      "pc_hl_cue_nn_non_linearity": "leaky-relu",
+      "pc_hl_cue_nn_last_layer": "sigmoid_ce",
+      "pc_hl_cue_nn_sparsen": false,
+      "pc_hl_cue_nn_softmax": false,
+      "pc_hl_cue_nn_gain": 1.0,
+      "pc_hl_cue_nn_sum_norm": 10.0,
+      "pc_hl_cue_nn_l2_regularizer": 0.000025,
+      "pc_hl_summarize_level": 0,
+      "pc_hl_max_outputs": 5,
+
+      "ifi_batch_size": 20,
+      "ifi_num_features": 15,
+      "ifi_scale_range": [1.0],
+      "ifi_pe_size": 15,
+      "ifi_pe_std": 2.375,
+      "ifi_nms_size": 5,
+      "ifi_nms_stride": 1,
+      "ifi_f_size": 7,
+      "ifi_f_std": 1,
+      "ifi_f_k": 1.6,
+      "ifi_summarize_level": 1,
+      "ifi_max_outputs": 3
+    }
+  },
+  "export-options": {
+    "export_filters": false
+  },
+  "workflow-options": {
+    "num_repeats": 40,
+    "evaluate": true,
+    "invert_images": false,
+    "resize_images_factor": 0.5,
+    "superclass": true,
+    "class_proportion": 1.0,
+    "train_classes": [],
+    "test_classes": [],
+    "batch_all_classes": false,
+    "batch_no_duplicates": false,
+
+    "degrade_type": "circle",
+    "degrade_step": "none",
+    "degrade_factor": 0.0,
+    "degrade_value": 0,
+
+    "noise_type": "sp_float",
+    "noise_step": "none",
+    "noise_factor": 0.0,
+
+    "train_recurse": false,
+    "test_recurse": true,
+    "recurse_iterations": 70,
+    "rsummary_batches": 0,
+    "visualise_vc": false,
+    "visualise_if_at_vc": false,
+    "evaluate_mode": ["instance"],
+    "evaluate_supermode": "none",
+    "summarize_completion": "to_file"
+  },
+  "parameter-sweeps": {
+    "workflow-options": [
+     {
+       "num_repeats": 40,
+       "noise_factor": 0.0,
+       "degrade_factor": 0.0,
+       "recurse_iterations": 70,
+       "evaluate_mode": ["instance"]
+     },
+     {
+       "num_repeats": 40,
+       "noise_factor": 0.05,
+       "degrade_factor": 0.05,
+       "recurse_iterations": 70,
+       "evaluate_mode": ["instance"]
+     },
+     {
+       "num_repeats": 40,
+       "noise_factor": 0.1,
+       "degrade_factor": 0.1,
+       "recurse_iterations": 70,
+       "evaluate_mode": ["instance"]
+     },
+     {
+       "num_repeats": 40,
+       "noise_factor": 0.15,
+       "degrade_factor": 0.15,
+       "recurse_iterations": 70,
+       "evaluate_mode": ["instance"]
+     },
+     {
+       "num_repeats": 40,
+       "noise_factor": 0.2,
+       "degrade_factor": 0.2,
+       "recurse_iterations": 70,
+       "evaluate_mode": ["instance"]
+     },
+     {
+       "num_repeats": 40,
+       "noise_factor": 0.25,
+       "degrade_factor": 0.25,
+       "recurse_iterations": 70,
+       "evaluate_mode": ["instance"]
+     },
+     {
+       "num_repeats": 40,
+       "noise_factor": 0.3,
+       "degrade_factor": 0.3,
+       "recurse_iterations": 70,
+       "evaluate_mode": ["instance"]
+     },
+     {
+       "num_repeats": 40,
+       "noise_factor": 0.35,
+       "degrade_factor": 0.35,
+       "recurse_iterations": 70,
+       "evaluate_mode": ["instance"]
+     },
+     {
+       "num_repeats": 40,
+       "noise_factor": 0.4,
+       "degrade_factor": 0.4,
+       "recurse_iterations": 70,
+       "evaluate_mode": ["instance"]
+     },
+     {
+       "num_repeats": 40,
+       "noise_factor": 0.45,
+       "degrade_factor": 0.45,
+       "recurse_iterations": 70,
+       "evaluate_mode": ["instance"]
+     },
+     {
+       "num_repeats": 40,
+       "noise_factor": 0.49,
+       "degrade_factor": 0.49,
+       "recurse_iterations": 70,
+       "evaluate_mode": ["instance"]
+     }
+    ],
+    "hparams": [],
+    "experiment-options": []
+  }
+}
