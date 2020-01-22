@@ -472,53 +472,53 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
     threshold = 100
     use_threshold = True
-    big_loop = True
+    big_loop = False
     big_loop_done = False
     random_recall = True
 
     from pagi.utils.np_utils import np_noise_salt_and_pepper
 
-    # if self._build_replay_dataset():
-    #   vc_encoding, _ = self._component.get_signal('vc')
-    #   vc_encoding_shape = vc_encoding.get_shape().as_list()
+    if self._build_replay_dataset():
+      vc_encoding, _ = self._component.get_signal('vc')
+      vc_encoding_shape = vc_encoding.get_shape().as_list()
 
-    #   random_noise_shape = self._component.get_pc().get_dual().get_pl('random_noise').get_shape().as_list()
+      random_noise_shape = self._component.get_pc().get_dual().get_pl('random_noise').get_shape().as_list()
 
-    #   random_noise = np.random.uniform(-1, 1, random_noise_shape)
-    #   # random_noise = np_noise_salt_and_pepper(random_noise, rate=1.0)
-    #   # random_noise = np.random.normal(size=random_noise_shape)
+      random_noise = np.random.uniform(-1, 1, random_noise_shape)
+      # random_noise = np_noise_salt_and_pepper(random_noise, rate=1.0)
+      # random_noise = np.random.normal(size=random_noise_shape)
 
-    #   print('Random noise =', random_noise_shape, np.min(random_noise), np.max(random_noise))
+      print('Random noise =', random_noise_shape, np.min(random_noise), np.max(random_noise))
 
-    #   if big_loop and self._replay_inputs:
-    #     print('Step =', test_step, '- Big Loop')
+      if big_loop and self._replay_inputs:
+        print('Step =', test_step, '- Big Loop')
 
-    #     batch_inputs, batch_labels = self._replay_preprocess(self._replay_inputs, self._replay_labels)
+        batch_inputs, batch_labels = self._replay_preprocess(self._replay_inputs, self._replay_labels)
 
-    #     testing_feed_dict.update({
-    #         self._component.get_dual().get_pl('replay'): True,
-    #         self._component.get_pc().get_dual().get_pl('random_recall'): True,
-    #         self._component.get_pc().get_dual().get_pl('use_inhibition'): True,
-    #         self._component.get_pc().get_dual().get_pl('random_noise'): random_noise,
-    #         self._component.get_dual().get_pl('replay_inputs'): batch_inputs,
-    #         self._component.get_dual().get_pl('replay_labels'): batch_labels
-    #     })
+        testing_feed_dict.update({
+            self._component.get_dual().get_pl('replay'): True,
+            self._component.get_pc().get_dual().get_pl('random_recall'): True,
+            self._component.get_pc().get_dual().get_pl('use_inhibition'): True,
+            self._component.get_pc().get_dual().get_pl('random_noise'): random_noise,
+            self._component.get_dual().get_pl('replay_inputs'): batch_inputs,
+            self._component.get_dual().get_pl('replay_labels'): batch_labels
+        })
 
-    #     big_loop_done = True
-    #   elif random_recall:
-    #     inhibition = np.zeros(vc_encoding_shape)
+        big_loop_done = True
+      elif random_recall:
+        inhibition = np.zeros(vc_encoding_shape)
 
-    #     print('Step =', test_step, '- Random Recall')
+        print('Step =', test_step, '- Random Recall')
 
-    #     testing_feed_dict.update({
-    #         self._component.get_pc().get_dual().get_pl('random_recall'): True,
-    #         self._component.get_pc().get_dual().get_pl('use_inhibition'): False,
-    #         self._component.get_pc().get_dual().get_pl('random_noise'): random_noise,
-    #         self._component.get_pc().get_dual().get_pl('inhibition'): inhibition
-    #     })
+        testing_feed_dict.update({
+            self._component.get_pc().get_dual().get_pl('random_recall'): True,
+            self._component.get_pc().get_dual().get_pl('use_inhibition'): False,
+            self._component.get_pc().get_dual().get_pl('random_noise'): random_noise,
+            self._component.get_pc().get_dual().get_pl('inhibition'): inhibition
+        })
 
-    #   self._replay_inputs = []
-    #   self._replay_labels = []
+      self._replay_inputs = []
+      self._replay_labels = []
 
     logging.info("**********>> Testing: Batch={}".format(test_step))
     testing_fetched = self._inference(test_step, testing_feed_dict, testing_fetches)

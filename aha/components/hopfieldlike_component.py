@@ -585,8 +585,8 @@ class HopfieldlikeComponent(Component):
       x_ext = self._dual.get_op('x_ext')
       x_direct = x_ext  # no weights, one-to-one mapping, so they are the same
 
-    x_direct = tf.Print(x_direct, [tf.reduce_min(x_direct), tf.reduce_max(x_direct), tf.reduce_mean(x_direct)], first_n=1)
-    x_direct = tf.Print(x_direct, [x_direct[0], '\n'], summarize=295, first_n=1)
+    # x_direct = tf.Print(x_direct, [tf.reduce_min(x_direct), tf.reduce_max(x_direct), tf.reduce_mean(x_direct)], first_n=1)
+    # x_direct = tf.Print(x_direct, [x_direct[0], '\n'], summarize=295, first_n=1)
 
     # x_direct = tf.random_normal(x_direct.shape, mean=tf.reduce_mean(x_direct), stddev=tf.reduce_std(x_direct))
 
