@@ -125,9 +125,9 @@ def main():
 
   models = {'aha': {}, 'ae': {}}
 
-  exp = 'oneshot'  # oneshot or instance
-  metric = 'replay'  # class or replay
-  perturb = 'noise'  # occ or noise
+  exp = 'instance'  # oneshot or instance
+  metric = 'class'  # class or replay
+  perturb = 'occ'  # occ or noise
 
   # parser = argparse.ArgumentParser(description='Process some integers.')
   # parser.add_argument('--input_path', type=str, help='an integer for the accumulator')
@@ -158,6 +158,7 @@ def main():
   _, ax = plt.subplots(1, 1, dpi=250, figsize=(8, 4))
 
   if metric == 'class':
+    vc_key = 'acc_mse_vc'
     plot_mean_sd(ax, xaxis,
                  vals=models['aha']['results_stats'][vc_key].mean,
                  ses=models['aha']['results_stats'][vc_key].se,
@@ -269,7 +270,7 @@ def main():
   ax.spines['right'].set_visible(False)
 
   if metric == 'class':
-    ax.plot(ax.get_xlim(), [y_ceil, acc_ceil], c='gray', dashes=[4, 2], linewidth=0.9)
+    ax.plot(ax.get_xlim(), [acc_ceil, acc_ceil], c='gray', dashes=[4, 2], linewidth=0.9)
 
   filename = exp + '_' + metric + '_' + perturb + '.png'
   plt.savefig(filename)
