@@ -96,11 +96,20 @@ class DeepAutoencoderComponent(AutoencoderComponent):
   def variables_networks(self, outer_scope):
     vars_nets = []
 
+    # Selectively include/exclude optimizer parameters
+    optim_ae = False
+    optim_pm_raw = True
+
     vars_nets += self._variables_encoder(outer_scope)
     vars_nets += self._variables_decoder(outer_scope)
 
+    if optim_ae:
+      vars_nets += self._variables_ae_optimizer(outer_scope)
+
     if self.use_pm_raw:
       vars_nets += self._variables_pm_raw(outer_scope)
+      if optim_pm_raw:
+        vars_nets += self._variables_pm_raw_optimizer(outer_scope)
 
     return vars_nets
 
@@ -168,15 +177,21 @@ class DeepAutoencoderComponent(AutoencoderComponent):
     """Put it into convolutional geometry: [batches, filter h, filter w, filters]"""
     return [self._hparams.batch_size, 1, 1, self._hparams.filters[-1]]
 
-  def _build_optimizer(self, loss_op, training_op_name):
+  def _build_optimizer(self, loss_op, training_op_name, scope=None):
     """Minimise loss using initialised a tf.train.Optimizer."""
 
     logging.info("-----------> Adding optimiser for op {0}".format(loss_op))
 
-    optimizer = self._setup_optimizer()
-    training = optimizer.minimize(loss_op, global_step=tf.train.get_or_create_global_step())
+    if scope is not None:
+      scope = 'optimizer/' + str(scope)
+    else:
+      scope = 'optimizer'
 
-    self._dual.set_op(training_op_name, training)
+    with tf.variable_scope(scope):
+      optimizer = self._setup_optimizer()
+      training = optimizer.minimize(loss_op, global_step=tf.train.get_or_create_global_step())
+
+      self._dual.set_op(training_op_name, training)
 
   def _setup_optimizer(self):
     """Initialise the Optimizer class specified by a hyperparameter."""
@@ -242,7 +257,7 @@ class DeepAutoencoderComponent(AutoencoderComponent):
     # Build loss and optimizer
     loss = self._build_loss_fn(self._input_values, output)
     self._dual.set_op('loss', loss)
-    self._build_optimizer(loss, 'training')
+    self._build_optimizer(loss, 'training', scope='ae')
 
   def _build_pm(self):
     """Preprocess the inputs and build the pattern mapping components."""
@@ -310,7 +325,8 @@ class DeepAutoencoderComponent(AutoencoderComponent):
     l2_size = target_size
 
     weights = []
-    with tf.variable_scope('pm' + name_suffix):
+    scope = 'pm' + name_suffix
+    with tf.variable_scope(scope):
       y1_layer = tf.layers.Dense(units=l1_size, activation=non_linearity1)
       y1 = y1_layer(x)
 
@@ -338,11 +354,23 @@ class DeepAutoencoderComponent(AutoencoderComponent):
         all_losses.append(weight_loss_scaled)
 
       all_losses_op = tf.add_n(all_losses, name='total_pm_loss')
-      self._build_optimizer(all_losses_op, 'training_pm' + name_suffix)
+      self._build_optimizer(all_losses_op, 'training_pm' + name_suffix, scope)
     else:
-      self._build_optimizer(loss, 'training_pm' + name_suffix)
+      self._build_optimizer(loss, 'training_pm' + name_suffix, scope)
 
     return y
+
+  @staticmethod
+  def _variables_ae_optimizer(outer_scope):
+    return tf.get_collection(
+        tf.GraphKeys.GLOBAL_VARIABLES,
+        scope=outer_scope + "/optimizer/ae")
+
+  @staticmethod
+  def _variables_pm_raw_optimizer(outer_scope):
+    return tf.get_collection(
+        tf.GraphKeys.GLOBAL_VARIABLES,
+        scope=outer_scope + "/optimizer/pm_raw")
 
   @staticmethod
   def _variables_encoder(outer_scope):
