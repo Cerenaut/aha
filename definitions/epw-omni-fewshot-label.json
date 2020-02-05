@@ -10,7 +10,7 @@
 
     "logging": "info",
     "seed": 42,
-    "batches": 800,
+    "batches": 40,
 
     "summarize": true,
     "track": true,

@@ -562,8 +562,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
       import os
       import matplotlib.pyplot as plt
+      plt.switch_backend('agg')
 
-      rows = 4
+      rows = 6
       cols = self._hparams.batch_size
       _, ax = plt.subplots(nrows=rows, ncols=cols, figsize=[10, 2], num=test_step)
       plt.subplots_adjust(left=0, right=1.0, bottom=0, top=1.0, hspace=0.1, wspace=0.1)
@@ -576,18 +577,20 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
         img_idx = col_idx
 
-        if row_idx == 1:
+        if row_idx in [1, 3]:
           label_idx = testing_fetched['labels'][img_idx]
           label_real = self._dataset.eval_classes[label_idx]
           ax.text(0.3, 0.3, str(label_real))
-        elif row_idx == 3:
+        elif row_idx == 5:
           label_idx = np.argmax(replay_labels[img_idx])
           label_real = self._dataset.eval_classes[label_idx]
           ax.text(0.3, 0.3, str(label_real))
         else:
           if row_idx == 0:
-            img = self._test_inputs[img_idx]
+            img = target_inputs[img_idx]
           elif row_idx == 2:
+            img = self._test_inputs[img_idx]
+          elif row_idx == 4:
             img = replay_images[img_idx]
 
           image_shape = [replay_images.shape[1], replay_images.shape[2]]
@@ -598,13 +601,10 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
       filetype = 'png'
       filename = 'replay_summary_' + str(test_step) + '.' + filetype
-      filepath = os.path.join('.', filename)
+      filepath = os.path.join(self._summary_dir, filename)
       plt.savefig(filepath, bbox_inches='tight', pad_inches=0.2, dpi=300, format=filetype)
 
-    print(testing_feed_dict.keys())
     logging.debug("          --------> Batch={},  Testing labels = {}".format(test_step, self._testing_features['labels'][0]))
-
-    return losses
 
     if not self._is_eval_batch(test_step):
       return losses
