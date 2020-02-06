@@ -34,6 +34,7 @@ from aha.components.episodic_component import EpisodicComponent
 
 from aha.datasets.omniglot_lake_dataset import OmniglotLakeDataset
 from aha.datasets.omniglot_lake_runs_dataset import OmniglotLakeRunsDataset
+from aha.datasets.omniglot_unseen_runs_dataset import OmniglotUnseenRunsDataset
 from aha.datasets.omniglot_unseen_oneshot_dataset import OmniglotUnseenOneShotDataset
 
 from aha.workflows.episodic_workflow import EpisodicWorkflow
@@ -271,6 +272,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
                                            self._opts['test_classes'],
                                            self.instance_mode())
       elif self._dataset_type.__name__ == OmniglotLakeRunsDataset.__name__:
+        self._dataset = self._dataset_type(self._dataset_location,
+                                           self._hparams.batch_size)
+      elif self._dataset_type.__name__ == OmniglotUnseenRunsDataset.__name__:
         self._dataset = self._dataset_type(self._dataset_location,
                                            self._hparams.batch_size)
       elif self._dataset_type.__name__ == OmniglotUnseenOneShotDataset.__name__:

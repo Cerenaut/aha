@@ -11,10 +11,13 @@ OUTPUT_PATH = './data/omniglot/all_runs_unseen'
 unseen_image_folder = './data/omniglot/images_evaluation_unseen'
 supervised_image_folder = './data/omniglot/images_evaluation_supervised'
 
+SEED = 50
 IGNORE_LIST = ['.DS_Store']
 
 UNSEEN_CLASS_MAP = {}
 SUPERVISED_CLASS_MAP = {}
+
+random.seed(SEED)
 
 for subset in os.listdir(supervised_image_folder):
   if subset in IGNORE_LIST:
@@ -54,7 +57,7 @@ for family in os.listdir(unseen_image_folder):
   if os.path.isdir(os.path.join(unseen_image_folder, family)):
     append_characters = False
     if family not in UNSEEN_CLASS_MAP:
-      UNSEEN_CLASS_MAP[family] = []
+      UNSEEN_CLASS_MAP[family] = {}
       append_characters = True
 
       for character in os.listdir(os.path.join(unseen_image_folder, family)):
@@ -62,7 +65,7 @@ for family in os.listdir(unseen_image_folder):
         if os.path.isdir(character_folder):
           character_files = os.listdir(character_folder)
           character_label = int(character_files[0].split('_')[0])
-          UNSEEN_CLASS_MAP[family].append((character_label, character, character_files))
+          UNSEEN_CLASS_MAP[family][character] = character_files
   else:
     logging.warning('Path to alphabet is not a directory: %s', os.path.join(unseen_image_folder, family))
 
@@ -72,9 +75,12 @@ num_seen = 19
 
 ALL_RUNS = {}
 
+from pathlib import Path
+from shutil import copyfile
+
 for run_idx in range(1, num_runs + 1):
   run_folder = 'run' + str(run_idx).zfill(2)
-  run_folder_path = os.path.join(OUTPUT_PATH, run_folder)
+
   ALL_RUNS[run_folder] = {
       'training': [],
       'test': []
@@ -82,6 +88,22 @@ for run_idx in range(1, num_runs + 1):
 
   seen_alphabets = random.sample(list(UNSEEN_CLASS_MAP), num_seen)
   unseen_alphabets = random.sample(list(UNSEEN_CLASS_MAP), num_unseen)
+
+  for alphabet in unseen_alphabets:
+    unseen_chars = UNSEEN_CLASS_MAP[alphabet]
+    random_char = random.sample(list(unseen_chars), 1)[0]
+
+    unseen_samples = unseen_chars[random_char]
+
+    train_sample = unseen_samples.pop(random.randrange(len(unseen_samples)))
+    test_sample = unseen_samples.pop(random.randrange(len(unseen_samples)))
+
+    train_sample_path = os.path.join(unseen_image_folder, alphabet, random_char, train_sample)
+    test_sample_path = os.path.join(unseen_image_folder, alphabet, random_char, test_sample)
+
+    print(train_sample_path)
+    ALL_RUNS[run_folder]['training'].append(train_sample_path)
+    ALL_RUNS[run_folder]['test'].append(test_sample_path)
 
   for alphabet in seen_alphabets:
     train_chars = SUPERVISED_CLASS_MAP['train'][alphabet]
@@ -95,9 +117,30 @@ for run_idx in range(1, num_runs + 1):
     train_sample = train_samples.pop(random.randrange(len(train_samples)))
     test_sample = test_samples.pop(random.randrange(len(test_samples)))
 
-    train_sample_path = os.path.join(run_folder)
-    print(train_sample)
-    print(test_sample)
-    break
+    train_sample_path = os.path.join(supervised_image_folder, 'train', alphabet, random_char, train_sample)
+    test_sample_path = os.path.join(supervised_image_folder, 'test', alphabet, random_char, test_sample)
 
-  break
+    ALL_RUNS[run_folder]['training'].append(train_sample_path)
+    ALL_RUNS[run_folder]['test'].append(test_sample_path)
+
+for run_folder in ALL_RUNS:
+  run_folder_path = os.path.join(OUTPUT_PATH, run_folder)
+  Path(run_folder_path).mkdir(parents=True, exist_ok=True)
+
+  train_folder_path = os.path.join(run_folder_path, 'training')
+  Path(train_folder_path).mkdir(parents=True, exist_ok=True)
+
+  for i, char_path in enumerate(ALL_RUNS[run_folder]['training']):
+    filename = os.path.basename(char_path)
+    character_label = int(filename.split('_')[0])
+    new_filename = 'class' + str(i + 1).zfill(2) + '_' + str(character_label) + '.png'
+    copyfile(char_path, os.path.join(train_folder_path, new_filename))
+
+  test_folder_path = os.path.join(run_folder_path, 'test')
+  Path(test_folder_path).mkdir(parents=True, exist_ok=True)
+
+  for i, char_path in enumerate(ALL_RUNS[run_folder]['test']):
+    filename = os.path.basename(char_path)
+    character_label = int(filename.split('_')[0])
+    new_filename = 'item' + str(i + 1).zfill(2) + '_' + str(character_label) + '.png'
+    copyfile(char_path, os.path.join(test_folder_path, new_filename))
