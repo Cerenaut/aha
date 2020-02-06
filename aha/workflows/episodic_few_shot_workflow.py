@@ -152,6 +152,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     self._replay_step = 0
 
     self._replay_inh = None
+    self._big_loop = False
 
     self._all_replay_inputs = []
     self._all_replay_labels = []
@@ -476,7 +477,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
     threshold = 100
     use_threshold = True
-    big_loop = False
+    big_loop = self._big_loop
     big_loop_done = False
     random_recall = True
 
@@ -497,12 +498,12 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
       if big_loop and self._replay_inputs:
         print('Step =', test_step, '- Big Loop')
 
-        batch_inputs, batch_labels = self._replay_preprocess(self._replay_inputs, self._replay_labels)
+        batch_inputs, batch_labels = self._replay_preprocess(self._all_replay_inputs, self._all_replay_labels)
 
         testing_feed_dict.update({
             self._component.get_dual().get_pl('replay'): True,
-            self._component.get_pc().get_dual().get_pl('random_recall'): True,
-            self._component.get_pc().get_dual().get_pl('use_inhibition'): True,
+            self._component.get_pc().get_dual().get_pl('random_recall'): False,
+            self._component.get_pc().get_dual().get_pl('use_inhibition'): False,
             self._component.get_pc().get_dual().get_pl('random_noise'): random_noise,
             self._component.get_dual().get_pl('replay_inputs'): batch_inputs,
             self._component.get_dual().get_pl('replay_labels'): batch_labels
@@ -550,6 +551,8 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
           if self._all_replay_labels:
             append = False
+
+            # The second condition makes it easier to track; but requires knowledge of training labels
             if np.argmax(replay_labels[i]) not in np.argmax(np.array(self._all_replay_labels), axis=1)[:] and (
                 np.argmax(replay_labels[i]) in testing_fetched['labels']
             ):
@@ -565,6 +568,10 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
         self._replay_inputs.append(replay_inputs[i])
         self._replay_labels.append(replay_labels[i])
+
+        # Do a big-loop iteration after we collect all images
+        if len(self._all_replay_inputs) == self._batch_size:
+          self._big_loop = True
 
       labels_retrieved = np.argmax(self._all_replay_labels, axis=1)
       labels_missing = np.setdiff1d(testing_fetched['labels'], labels_retrieved)
