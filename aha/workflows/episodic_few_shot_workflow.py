@@ -19,11 +19,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import logging
 import random
 
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 from pagi.components.summarize_levels import SummarizeLevels
 from pagi.utils import logger_utils, tf_utils, image_utils, data_utils
@@ -341,8 +343,6 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
       assert len(self._all_replay_inputs) == len(self._all_replay_labels)
 
-      import os
-      import matplotlib.pyplot as plt
       plt.switch_backend('agg')
 
       print('DEBUG: Exporting recalled images...')
@@ -400,7 +400,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     if self._build_replay_dataset():
       print('Building Replay Dataset...')
 
-      print('# samples', len(self._all_replay_inputs))
+      print('Number of samples =', len(self._all_replay_inputs))
 
       fetched = {}
       batch_type = self._setup_train_batch_types()
@@ -524,7 +524,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
       self._replay_inputs = []
       self._replay_labels = []
 
-    logging.info("**********>> Testing: Batch={}".format(test_step))
+    logging.debug("**********>> Testing: Batch={}".format(test_step))
     testing_fetched = self._inference(test_step, testing_feed_dict, testing_fetches)
 
     self._testing_features = self._extract_features(testing_fetched)
@@ -550,7 +550,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
           if self._all_replay_labels:
             append = False
-            if np.argmax(replay_labels[i]) not in np.argmax(np.array(self._all_replay_labels), axis=1)[:]:
+            if np.argmax(replay_labels[i]) not in np.argmax(np.array(self._all_replay_labels), axis=1)[:] and (
+                np.argmax(replay_labels[i]) in testing_fetched['labels']
+            ):
               append = True
         elif not use_threshold:
           append = True
@@ -559,13 +561,17 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
           self._all_replay_inputs.append(replay_inputs[i])
           self._all_replay_labels.append(replay_labels[i])
 
-          print('Sample # =', i, 'Label = ', np.max(label), np.argmax(label))
+          # print('Sample # =', i, 'Label = ', np.max(label), np.argmax(label))
 
         self._replay_inputs.append(replay_inputs[i])
         self._replay_labels.append(replay_labels[i])
 
-      import os
-      import matplotlib.pyplot as plt
+      labels_retrieved = np.argmax(self._all_replay_labels, axis=1)
+      labels_missing = np.setdiff1d(testing_fetched['labels'], labels_retrieved)
+
+      print('Labels retrieved ({0}) = {1}'.format(len(labels_retrieved), labels_retrieved))
+      print('Labels missing ({0}) = {1}'.format(len(labels_missing), labels_missing))
+
       plt.switch_backend('agg')
 
       rows = 6
@@ -604,7 +610,39 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         ax.axis('off')
 
       filetype = 'png'
-      filename = 'replay_summary_' + str(test_step) + '.' + filetype
+      filename = 'batch_replay_summary_' + str(test_step) + '.' + filetype
+      filepath = os.path.join(self._summary_dir, filename)
+      plt.savefig(filepath, bbox_inches='tight', pad_inches=0.2, dpi=300, format=filetype)
+      plt.clf()
+
+      rows = 2
+      cols = len(self._all_replay_inputs)
+      _, ax = plt.subplots(nrows=rows, ncols=cols, figsize=[10, 2], num=test_step)
+      plt.subplots_adjust(left=0, right=1.0, bottom=0, top=1.0, hspace=0.1, wspace=0.1)
+
+      # plot simple raster image on each sub-plot
+      for i, ax in enumerate(ax.flat):
+        # get indices of row/column
+        row_idx = i // cols
+        col_idx = i % cols
+
+        img_idx = col_idx
+
+        if row_idx == 1:
+          label_idx = np.argmax(self._all_replay_labels[img_idx])
+          label_real = self._dataset.eval_classes[label_idx]
+          ax.text(0.3, 0.3, str(label_real))
+        elif row_idx == 0:
+          img = self._all_replay_inputs[img_idx]
+
+          image_shape = [replay_images.shape[1], replay_images.shape[2]]
+          img = np.reshape(img, image_shape)
+          ax.imshow(img, cmap='binary', vmin=0, vmax=1)
+
+        ax.axis('off')
+
+      filetype = 'png'
+      filename = 'filtered_replay_summary_' + str(test_step) + '.' + filetype
       filepath = os.path.join(self._summary_dir, filename)
       plt.savefig(filepath, bbox_inches='tight', pad_inches=0.2, dpi=300, format=filetype)
 
