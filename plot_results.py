@@ -62,12 +62,30 @@ def concatenate_results(all_headings, all_values):
 
   return results
 
-def compute_statistics(results):
+def compute_statistics(results, thresh=None):
   """Compute summary statistics (min, max, mean, std, etc.) for each key in results."""
   results_stats = OrderedDict()
   summary_stats = namedtuple('summary_stats', 'mean, se, sd, count, mins, maxs')
 
+  def reject_outliers(data, m=1):
+    mask = abs(data - np.mean(data, axis=0)) < m * np.std(data, axis=0)
+    masked_array = np.ma.masked_array(data=data, mask=~mask)
+
+    # fill_value = np.max(masked_array)
+    fill_value = np.mean(masked_array)
+    # fill_value = 0.0
+
+    return masked_array.filled(fill_value)
+
   for k, v in results.items():
+    if thresh is not None:
+      if k == 'acc_mse_pm_raw':
+        new_v = reject_outliers(v)
+        for i, _ in enumerate(v):
+          print('before', v[i], '\n')
+          print('after', new_v[i], '\n\n')
+        v = new_v
+
     count = len(v)
     se = np.std(v, axis=0) / count
     sd = (se * count).mean()
@@ -104,7 +122,7 @@ def get_filenames(dirpath):
   filenames = []
   for root, _, files in os.walk(dirpath):
     for file in files:
-      if file.endswith('.log'):
+      if file.endswith('.log') or file.endswith('.txt'):
         filepath = os.path.join(root, file)
         filenames.append(filepath)
   return filenames
@@ -112,12 +130,13 @@ def get_filenames(dirpath):
 def plot_mean_sd(ax, xaxis, vals, ses, sd, label, color, mins, maxs, dashes=(None, None), alpha=0.08,
                  with_range=False):
   """Plot with optional error shadows."""
+  print(label, "-> SD = %.3f," % sd, "Best mean = %.3f," % vals.max(), "Best max = %.3f" % maxs.max())
+
   LW = 0.7
   ax.plot(xaxis, vals, label=label, c=color, dashes=dashes, linewidth=LW)
   ax.fill_between(xaxis, vals-ses, vals+ses, alpha=alpha, color=color)
   if with_range:
     ax.fill_between(xaxis, mins, maxs, alpha=alpha/2, color=color)
-  # print(label, "SD %.3f" % sd, "Best mean LSTM %.3f" % vals.max(), "best max %.3f" % maxs.max(), "mean %% of ceil %.3f" % (vals.max() / ACC_CEIL))
 
 
 def main():
@@ -125,17 +144,9 @@ def main():
 
   models = {'aha': {}, 'ae': {}}
 
-  exp = 'instance'  # oneshot or instance
+  exp = 'oneshot'  # oneshot or instance
   metric = 'class'  # class or replay
-  perturb = 'occ'  # occ or noise
-
-  # parser = argparse.ArgumentParser(description='Process some integers.')
-  # parser.add_argument('--input_path', type=str, help='an integer for the accumulator')
-
-  # args = parser.parse_args()
-
-  # if args.input_path is None or args.input_path == '' or not os.path.exists(args.input_path):
-  #   raise ValueError('Input path does not exist.')
+  perturb = 'noise'  # occ or noise
 
   for model in models.keys():
     dirpath = os.path.join(input_path, model + '-' + exp + '-' + 'class' + '-' + perturb)
@@ -149,13 +160,34 @@ def main():
 
     num_items = len(all_values[0])
 
+    thresh = None
+    # if model == 'ae':
+    #   thresh = 1.0
+
     models[model]['results'] = concatenate_results(all_headings, all_values)
-    models[model]['results_stats'] = compute_statistics(models[model]['results'] )
+    models[model]['results_stats'] = compute_statistics(models[model]['results'], thresh)
 
   xaxes = build_xaxis(num_items)
   xaxis = xaxes['diameter']
 
-  _, ax = plt.subplots(1, 1, dpi=250, figsize=(8, 4))
+  _, ax = plt.subplots(1, 1, dpi=250, figsize=(10, 5))
+
+  if exp == 'oneshot' and perturb == 'occ':
+    title = 'One-shot classification with occlusion'
+  elif exp == 'oneshot' and perturb == 'noise':
+    title = 'One-shot classification with noise'
+  elif exp == 'instance' and perturb == 'occ':
+    title = 'One-shot instance-classification with occlusion'
+  elif exp == 'instance' and perturb == 'noise':
+    title = 'One-shot instance-classification with noise'
+
+  if metric == 'class':
+    ylabel = 'Accuracy'
+    ymax = 1.0
+  elif metric == 'replay':
+    ylabel = 'Replay Loss'
+    # ymax = 0.3
+    ymax = None
 
   if metric == 'class':
     vc_key = 'acc_mse_vc'
@@ -209,9 +241,16 @@ def main():
                  with_range=True,
                  alpha=0.1)
 
+    ax.set_ylabel(ylabel)
+    ax.legend(loc='upper right')
+
+    if ymax is not None:
+      ax.set_ylim((0, ymax))
+
   elif metric == 'replay':
     replay_key = 'acc_mse_pm_raw'
 
+    aha_color = 'red'
     plot_mean_sd(ax, xaxis,
                  vals=models['aha']['results_stats'][replay_key].mean,
                  ses=models['aha']['results_stats'][replay_key].se,
@@ -219,21 +258,38 @@ def main():
                  mins=models['aha']['results_stats'][replay_key].mins,
                  maxs=models['aha']['results_stats'][replay_key].maxs,
                  label='LTM+AHA',
-                 color='red',
+                 color=aha_color,
                  dashes=(None, None),
                  with_range=True,
                  alpha=0.1)
 
-    # plot_mean_sd(ax, xaxis,
-    #              vals=models['ae']['results_stats'][replay_key].mean,
-    #              ses=models['ae']['results_stats'][replay_key].se,
-    #              sd=models['ae']['results_stats'][replay_key].sd, label='LTM+FastAE',
-    #              mins=models['ae']['results_stats'][replay_key].mins,
-    #              maxs=models['ae']['results_stats'][replay_key].maxs,
-    #              color='green',
-    #              dashes=(2, 1),
-    #              with_range=(None, None),
-    #              alpha=0.1)
+    ax.set_ylabel(ylabel, color=aha_color)
+    ax.tick_params(axis='y', labelcolor=aha_color)
+    ax.legend(loc='upper left')
+
+    ax2 = ax.twinx()
+
+    ae_color = 'green'
+    plot_mean_sd(ax2, xaxis,
+                 vals=models['ae']['results_stats'][replay_key].mean,
+                 ses=models['ae']['results_stats'][replay_key].se,
+                 sd=models['ae']['results_stats'][replay_key].sd, label='LTM+FastAE',
+                 mins=models['ae']['results_stats'][replay_key].mins,
+                 maxs=models['ae']['results_stats'][replay_key].maxs,
+                 color=ae_color,
+                 dashes=(2, 1),
+                 with_range=(None, None),
+                 alpha=0.1)
+
+    ax2.set_ylabel(ylabel, color=ae_color)
+    ax2.tick_params(axis='y', labelcolor=ae_color)
+    ax2.legend(loc='upper right')
+
+  ax.set_title(title)
+  ax.set_xlabel('Diameter')
+  ax.set_xlim((0, max(xaxis)))
+  ax.spines['top'].set_visible(False)
+  ax.spines['right'].set_visible(False)
 
   # Pick top accuracy without occlusion/noise as ceiling
   if metric == 'class':
@@ -242,39 +298,11 @@ def main():
                    models['aha']['results_stats'][pr_key].mean[0],
                    models['ae']['results_stats'][ae_key].mean[0])
 
-  if exp == 'oneshot' and perturb == 'occ':
-    title = 'One-shot classification with occlusion'
-  elif exp == 'oneshot' and perturb == 'noise':
-    title = 'One-shot classification with noise'
-  elif exp == 'instance' and perturb == 'occ':
-    title = 'One-shot instance-classification with occlusion'
-  elif exp == 'instance' and perturb == 'noise':
-    title = 'One-shot instance-classification with noise'
-
-  if metric == 'class':
-    ylabel = 'Accuracy'
-    ymax = 1.0
-  elif metric == 'replay':
-    ylabel = 'Replay Loss'
-    ymax = 0.3
-    # ymax = None
-
-  ax.set_title(title)
-  ax.set_xlabel('Diameter')
-  ax.legend(loc='upper right')
-  ax.set_ylabel(ylabel)
-  if ymax is not None:
-    ax.set_ylim((0, ymax))
-  ax.set_xlim((0, max(xaxis)))
-  ax.spines['top'].set_visible(False)
-  ax.spines['right'].set_visible(False)
-
-  if metric == 'class':
     ax.plot(ax.get_xlim(), [acc_ceil, acc_ceil], c='gray', dashes=[4, 2], linewidth=0.9)
 
   filename = exp + '_' + metric + '_' + perturb + '.png'
   plt.savefig(filename)
-  plt.show()
+  # plt.show()
 
 if __name__ == '__main__':
   main()
