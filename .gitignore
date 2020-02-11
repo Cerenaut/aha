@@ -108,6 +108,7 @@ filters*.png
 lc*.png
 *.local.*
 *.h5
+*.txt
 
 # Data
 data/
