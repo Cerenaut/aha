@@ -144,7 +144,7 @@ def main():
 
   models = {'aha': {}, 'ae': {}}
 
-  exp = 'oneshot'  # oneshot or instance
+  exp = 'instance'  # oneshot or instance
   metric = 'class'  # class or replay
   perturb = 'noise'  # occ or noise
 
@@ -286,7 +286,12 @@ def main():
     ax2.legend(loc='upper right')
 
   ax.set_title(title)
-  ax.set_xlabel('Diameter')
+
+  if perturb == 'noise':
+    ax.set_xlabel('Proportion')
+  elif perturb == 'occ':
+    ax.set_xlabel('Diameter')
+
   ax.set_xlim((0, max(xaxis)))
   ax.spines['top'].set_visible(False)
   ax.spines['right'].set_visible(False)
