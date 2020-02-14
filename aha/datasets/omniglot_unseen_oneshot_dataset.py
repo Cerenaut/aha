@@ -212,6 +212,15 @@ class OmniglotUnseenOneShotDataset(OmniglotUnseenDataset):
     self._dataset_show_files, self._dataset_show_labels = map(list, zip(*data_show))
     self._dataset_match_files, self._dataset_match_labels = map(list, zip(*data_match))
 
+    # start = 300
+    # end = 400
+
+    # self._dataset_show_files = self._dataset_show_files[start:end]
+    # self._dataset_show_labels = self._dataset_show_labels[start:end]
+
+    # self._dataset_match_files = self._dataset_match_files[start:end]
+    # self._dataset_match_labels = self._dataset_match_labels[start:end]
+
     # print('show_labels', self._dataset_show_labels, len(self._dataset_show_labels), '\n')
     # print('show_idx', data_show_idx, len(data_show_idx), '\n')
 

@@ -10,7 +10,7 @@
 
     "logging": "info",
     "seed": 42,
-    "batches": 40,
+    "batches": 800,
 
     "summarize": true,
     "track": true,
@@ -154,7 +154,8 @@
   },
   "export-options": {
     "export_filters": false,
-    "interval_batches": 40
+    "interval_batches": 40,
+    "max_to_keep": 20
   },
   "workflow-options": {
     "num_repeats": 40,
