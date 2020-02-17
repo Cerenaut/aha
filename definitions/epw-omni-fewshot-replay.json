@@ -10,7 +10,7 @@
 
     "logging": "info",
     "seed": 42,
-    "batches": 80,
+    "batches": 15,
 
     "summarize": true,
     "track": true,
@@ -156,9 +156,9 @@
     "export_filters": false
   },
   "workflow-options": {
-    "num_repeats": 40,
-    "num_replays": 20,
-    "consolidation_steps": 20,
+    "num_repeats": 15,
+    "num_replays": 10,
+    "consolidation_steps": 5,
     "evaluate": true,
     "invert_images": false,
     "resize_images_factor": 0.5,

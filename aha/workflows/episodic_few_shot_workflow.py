@@ -658,6 +658,8 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     self._testing_features = self._extract_features(testing_fetched)
     self._test_inputs = testing_fetched['test_inputs']
 
+    from skimage.measure import compare_ssim
+
     if self._build_replay_dataset():
       replay_inputs = np.reshape(testing_fetched['pc']['ec_out_raw'], self._dataset.shape)
       replay_images = replay_inputs
@@ -682,6 +684,13 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
             if self._all_replay_labels:
               append = False
 
+              for bfr_img, bfr_label in zip(self._all_replay_inputs, self._all_replay_labels):
+                print(bfr_image.shape, np.squeeze(bfr_img).shape)
+
+                (score, diff) = compare_ssim(np.squeeze(bfr_img), np.squeeze(image), full=True)
+                print('BFR Label =', bfr_label, 'Current label =', label)
+                print('SSIM =', score, diff)
+
               # The second condition makes it easier to track; but requires knowledge of training labels
               if np.argmax(replay_labels[i]) not in np.argmax(np.array(self._all_replay_labels), axis=1)[:]:
                 append = True
@@ -702,7 +711,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         #     len(self._all_replay_inputs) == self._hparams.batch_size):
         #   self._big_loop = True
 
-      if (self._replay_step + 1) % self._opts['num_replays'] == 0 and self._all_replay_labels:
+      # interval = self._opts['num_replays']
+      interval = 1
+      if (self._replay_step + 1) % interval == 0 and self._all_replay_labels:
         labels_retrieved = np.argmax(self._all_replay_labels, axis=1)
         labels_missing = np.setdiff1d(testing_fetched['labels'], labels_retrieved)
 
