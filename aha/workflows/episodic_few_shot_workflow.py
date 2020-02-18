@@ -922,7 +922,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         self._report_average_metric('ll_ensemble_accuracy_unseen', losses['ll_ensemble_accuracy_unseen'])
 
       if self._component.get_pc().use_pm_raw is True:
-        vc_input = self._component.get_vc().get_inputs()
+        vc_input = target_inputs
         ec_out_raw = self._component.get_pc().get_ec_out_raw()
 
         vc_input_flat = np.reshape(vc_input, [vc_input.shape[0], np.prod(vc_input.shape[1:])])
