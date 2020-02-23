@@ -31,9 +31,8 @@
       "summarize_level": 1,
       "max_outputs": 3,
 
-
       "vc_num_layers": 1,
-      "vc_batch_size": [20],
+      "vc_batch_size": 20,
       "vc_learning_rate": [0.001],
       "vc_sparsity": [4],
       "vc_sparsity_output_factor": [1.0],
@@ -46,10 +45,10 @@
       "vc_use_unpooling": ["fixed"],
       "vc_use_max_pool": ["none"],
       "vc_secondary": [true],
-      "vc_nonlinearity": ["none"],
+      "vc_encoder_nonlinearity": ["none"],
+      "vc_decoder_nonlinearity": ["none"],
       "vc_summarize_level": [1],
       "vc_max_outputs": [3],
-
 
       "ifi_batch_size": 20,
       "ifi_num_features": 15,
@@ -63,7 +62,6 @@
       "ifi_f_k": 1.6,
       "ifi_summarize_level": 1,
       "ifi_max_outputs": 3,
-
 
       "pc_dae_num_layers": 3,
       "pc_dae_batch_size": 20,
@@ -100,12 +98,12 @@
 
     "degrade_type": "circle",
     "degrade_step": "none",
-    "degrade_factor": 0.15,
+    "degrade_factor": 0.0,
     "degrade_value": 0,
 
     "noise_type": "sp_float",
-    "noise_step": "test",
-    "noise_factor": 0.15,
+    "noise_step": "none",
+    "noise_factor": 0.0,
 
     "train_recurse": false,
     "test_recurse": false,
@@ -113,7 +111,7 @@
     "rsummary_batches": 0,
     "visualise_vc": false,
     "visualise_if_at_vc": false,
-    "evaluate_mode": ["instance"],
+    "evaluate_mode": ["oneshot"],
     "evaluate_supermode": "none",
     "summarize_completion": "to_file"
   },
@@ -195,158 +193,9 @@
        "degrade_factor": 0.49,
        
        "evaluate_mode": ["oneshot"]
-     },
-
-
-
-     {
-       "num_repeats": 40,
-       "noise_factor": 0.0,
-       "degrade_factor": 0.0,
-       
-       "evaluate_mode": ["instance"]
-     },
-     {
-       "num_repeats": 40,
-       "noise_factor": 0.05,
-       "degrade_factor": 0.05,
-       
-       "evaluate_mode": ["instance"]
-     },
-     {
-       "num_repeats": 40,
-       "noise_factor": 0.1,
-       "degrade_factor": 0.1,
-       
-       "evaluate_mode": ["instance"]
-     },
-     {
-       "num_repeats": 40,
-       "noise_factor": 0.15,
-       "degrade_factor": 0.15,
-       
-       "evaluate_mode": ["instance"]
-     },
-     {
-       "num_repeats": 40,
-       "noise_factor": 0.2,
-       "degrade_factor": 0.2,
-       
-       "evaluate_mode": ["instance"]
-     },
-     {
-       "num_repeats": 40,
-       "noise_factor": 0.25,
-       "degrade_factor": 0.25,
-       
-       "evaluate_mode": ["instance"]
-     },
-     {
-       "num_repeats": 40,
-       "noise_factor": 0.3,
-       "degrade_factor": 0.3,
-       
-       "evaluate_mode": ["instance"]
-     },
-     {
-       "num_repeats": 40,
-       "noise_factor": 0.35,
-       "degrade_factor": 0.35,
-       
-       "evaluate_mode": ["instance"]
-     },
-     {
-       "num_repeats": 40,
-       "noise_factor": 0.4,
-       "degrade_factor": 0.4,
-       
-       "evaluate_mode": ["instance"]
-     },
-     {
-       "num_repeats": 40,
-       "noise_factor": 0.45,
-       "degrade_factor": 0.45,
-       
-       "evaluate_mode": ["instance"]
-     },
-     {
-       "num_repeats": 40,
-       "noise_factor": 0.49,
-       "degrade_factor": 0.49,
-       
-       "evaluate_mode": ["instance"]
      }
     ],
     "hparams": [],
-    "experiment-options": [
-      {
-        "dataset": "datasets.omniglot_lake_runs_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_runs_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_runs_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_runs_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_runs_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_runs_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_runs_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_runs_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_runs_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_runs_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_runs_dataset"
-      },
-
-
-      {
-        "dataset": "datasets.omniglot_lake_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_dataset"
-      },
-      {
-        "dataset": "datasets.omniglot_lake_dataset"
-      }
-    ]
+    "experiment-options": []
   }
 }

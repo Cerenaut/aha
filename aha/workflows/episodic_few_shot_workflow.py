@@ -484,7 +484,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
         vc_input_flat = np.reshape(vc_input, [vc_input.shape[0], np.prod(vc_input.shape[1:])])
         ec_out_raw_flat = np.reshape(ec_out_raw, [ec_out_raw.shape[0], np.prod(ec_out_raw.shape[1:])])
-        
+
         ec_out_raw_flat = np.clip(ec_out_raw_flat, a_min=None, a_max=np.max(vc_input_flat))
 
         pm_raw_mse = np.square(vc_input_flat - ec_out_raw_flat).mean()
