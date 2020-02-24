@@ -497,26 +497,29 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
     if self._consolidation_mode():
       print('\n')
-      print('Consolidation Step =', self._consolidation_step)
+      print('Consolidation Step -', self._consolidation_step)
 
-      assert len(self._all_replay_inputs) == len(self._all_replay_labels)
+      if self._all_replay_inputs:
+        assert len(self._all_replay_inputs) == len(self._all_replay_labels)
 
-      random_sample = True
+        random_sample = True
 
-      if random_sample:
-        replay_inputs, replay_labels = self._replay_preprocess(self._all_replay_inputs, self._all_replay_labels)
+        if random_sample:
+          replay_inputs, replay_labels = self._replay_preprocess(self._all_replay_inputs, self._all_replay_labels)
 
-        batch_inputs, batch_labels = self._random_sample(replay_inputs, replay_labels)
+          batch_inputs, batch_labels = self._random_sample(replay_inputs, replay_labels)
+        else:
+          batch_inputs = np.array(self._all_replay_inputs)
+          batch_labels = np.array(self._all_replay_labels)
+
+        feed_dict.update({
+            self._component.get_dual().get_pl('replay'): True,
+
+            self._component.get_dual().get_pl('replay_inputs'): batch_inputs,
+            self._component.get_dual().get_pl('replay_labels'): batch_labels
+        })
       else:
-        batch_inputs = np.array(self._all_replay_inputs)
-        batch_labels = np.array(self._all_replay_labels)
-
-      feed_dict.update({
-          self._component.get_dual().get_pl('replay'): True,
-
-          self._component.get_dual().get_pl('replay_inputs'): batch_inputs,
-          self._component.get_dual().get_pl('replay_labels'): batch_labels
-      })
+        print('Using groundtruth data for consolidation...')
 
     return feed_dict
 
@@ -601,7 +604,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
     threshold = 100
     use_threshold = True
-    random_recall = True
+    random_recall = False
     big_loop_done = False
     big_loop = self._big_loop
 
@@ -611,7 +614,6 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
       random_noise_shape = self._component.get_pc().get_dual().get_pl('random_noise').get_shape().as_list()
 
       random_noise = np.random.uniform(-1, 1, random_noise_shape)
-
       # print('Random Noise =', random_noise_shape, np.min(random_noise), np.max(random_noise))
 
       if big_loop and self._replay_inputs:
@@ -621,9 +623,6 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         self._replay_labels = np.array(self._replay_labels)
 
         batch_inputs, batch_labels = self._replay_preprocess(self._replay_inputs, self._replay_labels)
-
-        # if batch_inputs.shape[0] < self._hparams.batch_size:
-        #   batch_inputs, batch_labels = self._random_sample(batch_inputs, batch_labels)
 
         testing_feed_dict.update({
             self._component.get_dual().get_pl('replay'): True,
@@ -658,7 +657,12 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     self._testing_features = self._extract_features(testing_fetched)
     self._test_inputs = testing_fetched['test_inputs']
 
-    from skimage.measure import compare_ssim
+    if self._all_replay_labels:
+      labels_retrieved = np.argmax(self._all_replay_labels, axis=1)
+      labels_missing = np.setdiff1d(testing_fetched['labels'], labels_retrieved)
+      labels_unique = np.unique(labels_retrieved)
+
+    # from skimage.measure import compare_ssim
 
     if self._build_replay_dataset():
       replay_inputs = np.reshape(testing_fetched['pc']['ec_out_raw'], self._dataset.shape)
@@ -676,24 +680,37 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
           # If in big loop, only append when big loop is done
           elif big_loop and big_loop_done:
-            append = False
+            # append = False
+            append = True
 
-            if np.argmax(replay_labels[i]) in testing_fetched['labels']:
-              append = True
+            # # Only append labels that match groundtruth
+            # if np.argmax(replay_labels[i]) in testing_fetched['labels']:
+            #   append = True
 
-            if self._all_replay_labels:
-              append = False
+            # # n = 5
+            # # top_n = replay_labels[i].argsort()[-n:][::-1]
+            # # print(i, top_n, replay_labels[i][top_n])
 
-              for bfr_img, bfr_label in zip(self._all_replay_inputs, self._all_replay_labels):
-                print(bfr_image.shape, np.squeeze(bfr_img).shape)
+            # # Avoid duplicate images
+            # if append and self._all_replay_labels:
+            #   append = False
 
-                (score, diff) = compare_ssim(np.squeeze(bfr_img), np.squeeze(image), full=True)
-                print('BFR Label =', bfr_label, 'Current label =', label)
-                print('SSIM =', score, diff)
+            #   # for bfr_img, bfr_label in zip(self._all_replay_inputs, self._all_replay_labels):
+            #   #   print(bfr_image.shape, np.squeeze(bfr_img).shape)
 
-              # The second condition makes it easier to track; but requires knowledge of training labels
-              if np.argmax(replay_labels[i]) not in np.argmax(np.array(self._all_replay_labels), axis=1)[:]:
-                append = True
+            #   #   (score, diff) = compare_ssim(np.squeeze(bfr_img), np.squeeze(image), full=True)
+            #   #   print('BFR Label =', bfr_label, 'Current label =', label)
+            #   #   print('SSIM =', score, diff)
+
+            #   # The second condition makes it easier to track; but requires knowledge of training labels
+            #   if np.argmax(replay_labels[i]) not in np.argmax(np.array(self._all_replay_labels), axis=1)[:]:
+            #     append = True
+
+            # Limit buffer to batch_size length
+            # Note: Maybe we don't need to limit this.
+            # if len(self._replay_labels) >= self._hparams.batch_size:
+            #   append = False
+
         elif not use_threshold:
           append = True
 
@@ -711,15 +728,14 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         #     len(self._all_replay_inputs) == self._hparams.batch_size):
         #   self._big_loop = True
 
-      # interval = self._opts['num_replays']
-      interval = 1
+      interval = self._opts['num_replays']
+
       if (self._replay_step + 1) % interval == 0 and self._all_replay_labels:
-        labels_retrieved = np.argmax(self._all_replay_labels, axis=1)
-        labels_missing = np.setdiff1d(testing_fetched['labels'], labels_retrieved)
 
         print('Labels retrieved ({0}) = {1}'.format(len(labels_retrieved), labels_retrieved))
         print('Labels missing ({0}) = {1}'.format(len(labels_missing), labels_missing))
         print('Groundtruth =', testing_fetched['labels'])
+        print('Unique =', labels_unique)
 
         plt.switch_backend('agg')
 
@@ -946,6 +962,12 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
       if pc_at_vc is not None:
         losses['loss_pc_at_vc'] = np.square(self._test_inputs - pc_at_vc).mean()
+
+    if self._consolidation_mode() and  self._all_replay_inputs:
+      losses['recalled_unseen'] = int(testing_fetched['labels'][0] in labels_retrieved)
+      losses['recalled_batch'] = int(len(labels_missing) == 0)
+      losses['num_unique_recalled'] = len(labels_unique)
+      losses['num_samples_recalled'] = len(labels_retrieved)
 
     return losses
 
