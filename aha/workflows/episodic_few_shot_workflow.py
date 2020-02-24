@@ -306,6 +306,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
   def _setup_checkpoint_saver(self):
     """Handles the saving and restoration of graph state and variables."""
 
+    if not self._replay_mode():
+      return super()._setup_checkpoint_saver()
+
     max_to_keep = self._export_opts['max_to_keep']
 
     # First call to this function by setup()
