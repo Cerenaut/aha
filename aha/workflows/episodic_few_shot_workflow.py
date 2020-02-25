@@ -487,7 +487,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
         print('vc stats', np.min(vc_input_flat), np.max(vc_input_flat))
         print('pm_raw stats (before)', np.min(ec_out_raw_flat), np.max(ec_out_raw_flat))
-        ec_out_raw_flat = np.clip(ec_out_raw_flat, a_min=None, a_max=np.max(vc_input_flat))
+        ec_out_raw_flat = np.clip(ec_out_raw_flat, a_min=np.min(vc_input_flat), a_max=np.max(vc_input_flat))
         print('pm_raw stats (after)', np.min(ec_out_raw_flat), np.max(ec_out_raw_flat))
 
         pm_raw_mse = np.square(vc_input_flat - ec_out_raw_flat).mean()
