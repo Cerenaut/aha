@@ -81,6 +81,8 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         num_repeats=1,
         num_replays=1,
         consolidation_steps=0,
+        random_recall=False,
+        replay_buffer_threshold=0.0,
         superclass=False,
         class_proportion=1.0,
         invert_images=False,
@@ -605,11 +607,12 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         }
     )
 
-    threshold = 100
-    use_threshold = True
-    random_recall = False
-    big_loop_done = False
+    threshold = self._opts['replay_buffer_threshold']
+    use_threshold = threshold > 0
+    random_recall = self._opts['random_recall']
+
     big_loop = self._big_loop
+    big_loop_done = False
 
     if self._build_replay_dataset():
       vc_encoding, _ = self._component.get_signal('vc')
