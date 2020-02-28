@@ -603,6 +603,9 @@ class HopfieldlikeComponent(Component):
     # only update the relevant neurons
     y = self._neuron_update(input_size, x_fb, y_potential)
 
+    # Normalize Hopfield output
+    y = normalize_minmax(y)
+
     # 'decoding' for output in same dimensions as input, and for consistency with other components
     y_reshaped = tf.reshape(y, input_values_shape)
 
@@ -623,7 +626,7 @@ class HopfieldlikeComponent(Component):
 
     # map to input
     pc_out = self._dual.get_op('y')  # output of Hopfield (PC)
-    pc_out = normalize_minmax(pc_out)
+    # pc_out = normalize_minmax(pc_out)
 
     pc_target = self._dual.get_op('pr_target')
 
