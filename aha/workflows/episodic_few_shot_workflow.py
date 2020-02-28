@@ -81,7 +81,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         num_repeats=1,
         num_replays=1,
         consolidation_steps=0,
-        random_recall=False,
+        random_recall=None,
         replay_buffer_threshold=0.0,
         superclass=False,
         class_proportion=1.0,
@@ -595,7 +595,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     if self._consolidation_mode():
       testing_feed_dict.update({
           self._component.get_dual().get_pl('replay'): False,
-          self._component.get_pc().get_dual().get_pl('random_recall'): False
+          self._component.get_pc().get_dual().get_pl('random_recall'): ''
       })
 
     # 2) Run AMTL on test set (when enabled, will get PC completion of input image)
@@ -618,10 +618,11 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     if self._build_replay_dataset():
       vc_encoding, _ = self._component.get_signal('vc')
       vc_encoding_shape = vc_encoding.get_shape().as_list()
-      random_noise_shape = self._component.get_pc().get_dual().get_pl('random_noise').get_shape().as_list()
+      pr_noise_shape = self._component.get_pc().get_dual().get_pl('pr_noise').get_shape().as_list()
+      pc_noise_shape = self._component.get_pc().get_dual().get_pl('pc_noise').get_shape().as_list()
 
-      random_noise = np.random.uniform(-1, 1, random_noise_shape)
-      # print('Random Noise =', random_noise_shape, np.min(random_noise), np.max(random_noise))
+      pc_random_noise = np.random.uniform(-1, 1, pc_noise_shape)
+      pr_random_noise = np.random.uniform(-1, 1, pr_noise_shape)
 
       if big_loop and self._replay_inputs:
         print('Replay Mode =', 'Big-Loop Recurrence')
@@ -633,9 +634,10 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
         testing_feed_dict.update({
             self._component.get_dual().get_pl('replay'): True,
-            self._component.get_pc().get_dual().get_pl('random_recall'): False,
             self._component.get_pc().get_dual().get_pl('use_inhibition'): False,
-            self._component.get_pc().get_dual().get_pl('random_noise'): random_noise,
+            self._component.get_pc().get_dual().get_pl('random_recall'): '',
+            self._component.get_pc().get_dual().get_pl('pc_noise'): pc_random_noise,
+            self._component.get_pc().get_dual().get_pl('pr_noise'): pr_random_noise,
             self._component.get_dual().get_pl('replay_inputs'): batch_inputs,
             self._component.get_dual().get_pl('replay_labels'): batch_labels
         })
@@ -644,12 +646,13 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         self._big_loop = False
 
       elif random_recall:
-        print('Replay Mode =', 'Random Recall')
+        print('Replay Mode =', 'Random Recall', 'using', random_recall)
 
         testing_feed_dict.update({
-            self._component.get_pc().get_dual().get_pl('random_recall'): True,
+            self._component.get_pc().get_dual().get_pl('random_recall'): random_recall,
             self._component.get_pc().get_dual().get_pl('use_inhibition'): False,
-            self._component.get_pc().get_dual().get_pl('random_noise'): random_noise,
+            self._component.get_pc().get_dual().get_pl('pc_noise'): pc_random_noise,
+            self._component.get_pc().get_dual().get_pl('pr_noise'): pr_random_noise,
             self._component.get_pc().get_dual().get_pl('inhibition'): np.zeros(vc_encoding_shape)
         })
 
@@ -740,10 +743,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         labels_missing = np.setdiff1d(testing_fetched['labels'], labels_retrieved)
         labels_unique = np.unique(labels_retrieved)
 
-      pc_in_train = self._component.get_pc().get_input('training')
-      pc_in_test = self._component.get_pc().get_input('encoding')
       _, pc_input_shape = self._component.get_signal('pc_input')
-      print(pc_input_shape)
 
       if (self._replay_step + 1) % interval == 0 and self._all_replay_labels:
 

@@ -467,6 +467,10 @@ class HopfieldlikeComponent(Component):
       # ---------------------------------------------------
       self._setup_inputs()    # sets: x_cue, x_ext, x_fb
 
+      self._random_recall = self._dual.add('random_recall',
+                                           shape=[],
+                                           default_value='').add_pl(default=True, dtype=tf.string)
+
       # 1) build cue mapping for retrieval (if relevant)
       # ---------------------------------------------------
       if self._use_input_cue:
@@ -585,13 +589,12 @@ class HopfieldlikeComponent(Component):
       x_ext = self._dual.get_op('x_ext')
       x_direct = x_ext  # no weights, one-to-one mapping, so they are the same
 
-    # x_direct = tf.Print(x_direct, [tf.reduce_min(x_direct), tf.reduce_max(x_direct), tf.reduce_mean(x_direct)], first_n=1)
-    # x_direct = tf.Print(x_direct, [x_direct[0], '\n'], summarize=295, first_n=1)
+    pc_noise = self._dual.add('pc_noise',
+                              shape=x_direct.shape,
+                              default_value=0.0).add_pl(default=True, dtype=x_direct.dtype)
 
-    # x_direct = tf.random_normal(x_direct.shape, mean=tf.reduce_mean(x_direct), stddev=tf.reduce_std(x_direct))
-
-    # x_direct = tf.Print(x_direct, [tf.reduce_min(x_direct), tf.reduce_max(x_direct), tf.reduce_mean(x_direct)])
-    # x_direct = tf.Print(x_direct, [x_direct[0], '\n\n'], summarize=295)
+    # Swap 'x_direct' during random recall at PC
+    x_direct = tf.cond(tf.equal(self._random_recall, 'pc'), lambda: pc_noise, lambda: x_direct)
 
     x_fb = self._dual.get_pl('x_fb')
     z = tf.matmul(x_fb, w) + x_direct  # weighted sum + bias
@@ -796,22 +799,30 @@ class HopfieldlikeComponent(Component):
     x_nn_shape = x_nn.get_shape().as_list()
     x_nn_size = np.prod(x_nn_shape[1:])
 
-    random_recall = self._dual.add('random_recall', shape=[], default_value=False).add_pl(default=True, dtype=tf.bool)
-    random_noise = self._dual.add('random_noise', shape=x_nn.shape, default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
-    inhibition = self._dual.add('inhibition', shape=x_nn.shape, default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
-    use_inhibition = self._dual.add('use_inhibition', shape=[], default_value=False).add_pl(default=True, dtype=tf.bool)
+    pr_noise = self._dual.add('pr_noise',
+                              shape=x_nn.shape,
+                              default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
+
+    inhibition = self._dual.add('inhibition',
+                                shape=x_nn.shape,
+                                default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
+
+    use_inhibition_pl = self._dual.add('use_inhibition',
+                                       shape=[],
+                                       default_value=False).add_pl(default=True, dtype=tf.bool)
 
     if self.use_inhibition:
       decay = 0.5
       inhibition_decayed = decay * inhibition + (1 - decay) * x_nn
       self._dual.set_op('inhibition', inhibition_decayed)
 
-    inhibition_noise = random_noise + inhibition_decayed
-
-    random_cue = tf.cond(tf.equal(use_inhibition, True), lambda: inhibition_noise, lambda: random_noise)
+      inhibition_noise = pr_noise + inhibition_decayed
+      random_cue = tf.cond(tf.equal(use_inhibition_pl, True), lambda: inhibition_noise, lambda: pr_noise)
+    else:
+      random_cue = pr_noise
 
     # Swap 'x_nn' during random recall
-    x_nn = tf.cond(tf.equal(random_recall, True), lambda: random_cue, lambda: x_nn)
+    x_nn = tf.cond(tf.equal(self._random_recall, 'pr'), lambda: random_cue, lambda: x_nn)
 
     x_nn = x_nn
 

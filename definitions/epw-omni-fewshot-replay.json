@@ -159,7 +159,7 @@
     "num_repeats": 6,
     "num_replays": 5,
     "consolidation_steps": 1,
-    "random_recall": true,
+    "random_recall": "pc",
     "replay_buffer_threshold": 100.0,
 
     "evaluate": true,
