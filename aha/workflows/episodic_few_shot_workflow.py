@@ -159,6 +159,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     self._big_loop = False
 
     self._all_replay_inputs = []
+    self._all_replay_patterns = []
     self._all_replay_labels = []
 
     self._load_next_checkpoint = 0
@@ -267,7 +268,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
                                                                   num_batch_repeats=self._opts['num_repeats'],
                                                                   # recurse_iterations=self._opts['recurse_iterations'],
                                                                   recurse_iterations=test_recurse_iterations,
-                                                                  additional_test_decodes=1,
+                                                                  additional_test_decodes=additional_decode,
                                                                   evaluate_step=self._opts['evaluate'],
                                                                   use_trainset_for_tests=same_train_and_test,
                                                                   invert_images=self._opts['invert_images'],
@@ -663,11 +664,6 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     self._testing_features = self._extract_features(testing_fetched)
     self._test_inputs = testing_fetched['test_inputs']
 
-    if self._all_replay_labels:
-      labels_retrieved = np.argmax(self._all_replay_labels, axis=1)
-      labels_missing = np.setdiff1d(testing_fetched['labels'], labels_retrieved)
-      labels_unique = np.unique(labels_retrieved)
-
     # from skimage.measure import compare_ssim
 
     if self._build_replay_dataset():
@@ -675,6 +671,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
       replay_images = replay_inputs
 
       replay_labels = testing_fetched['ll_pc']['preds']
+      replay_patterns = testing_fetched['pc']['y']
 
       for i, (image, label) in enumerate(zip(replay_inputs, replay_labels)):
         append = False
@@ -722,6 +719,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
         if append:
           self._all_replay_inputs.append(replay_inputs[i])
+          self._all_replay_patterns.append(replay_patterns[i])
           self._all_replay_labels.append(replay_labels[i])
 
           # print('Sample # =', i, 'Label = ', np.max(label), np.argmax(label))
@@ -734,7 +732,18 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         #     len(self._all_replay_inputs) == self._hparams.batch_size):
         #   self._big_loop = True
 
-      interval = self._opts['num_replays']
+      # interval = self._opts['num_replays']
+      interval = 1
+
+      if self._all_replay_labels:
+        labels_retrieved = np.argmax(self._all_replay_labels, axis=1)
+        labels_missing = np.setdiff1d(testing_fetched['labels'], labels_retrieved)
+        labels_unique = np.unique(labels_retrieved)
+
+      pc_in_train = self._component.get_pc().get_input('training')
+      pc_in_test = self._component.get_pc().get_input('encoding')
+      _, pc_input_shape = self._component.get_signal('pc_input')
+      print(pc_input_shape)
 
       if (self._replay_step + 1) % interval == 0 and self._all_replay_labels:
 
@@ -745,7 +754,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
         plt.switch_backend('agg')
 
-        rows = 6
+        rows = 7
         cols = self._hparams.batch_size
         _, ax = plt.subplots(nrows=rows, ncols=cols, figsize=[10, 2], num=test_step)
         plt.subplots_adjust(left=0, right=1.0, bottom=0, top=1.0, hspace=0.1, wspace=0.1)
@@ -773,10 +782,16 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
               img = self._test_inputs[img_idx]
             elif row_idx == 4:
               img = replay_images[img_idx]
+            elif row_idx == 6:
+              img = replay_patterns[img_idx]
 
-            image_shape = [replay_images.shape[1], replay_images.shape[2]]
-            img = np.reshape(img, image_shape)
-            ax.imshow(img, cmap='binary', vmin=0, vmax=1)
+            if row_idx in [0, 2, 4]:
+              image_shape = [replay_images.shape[1], replay_images.shape[2]]
+              img = np.reshape(img, image_shape)
+              ax.imshow(img, cmap='binary', vmin=0, vmax=1)
+            else:
+              img = np.reshape(img, [pc_input_shape[1], pc_input_shape[2]])
+              ax.imshow(img, vmin=-1, vmax=1)
 
           ax.axis('off')
 
@@ -786,7 +801,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         plt.savefig(filepath, bbox_inches='tight', pad_inches=0.2, dpi=300, format=filetype)
         plt.clf()
 
-        rows = 2
+        rows = 3
         cols = len(self._all_replay_inputs)
         _, ax = plt.subplots(nrows=rows, ncols=cols, figsize=[10, 2], num=test_step)
         plt.subplots_adjust(left=0, right=1.0, bottom=0, top=1.0, hspace=0.1, wspace=0.1)
@@ -802,13 +817,18 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
           if row_idx == 1:
             label_idx = np.argmax(self._all_replay_labels[img_idx])
             label_real = self._dataset.eval_classes[label_idx]
-            ax.text(0.3, 0.3, str(label_real))
+            ax.text(0.3, 0.3, str(label_real), fontsize=9)
           elif row_idx == 0:
             img = self._all_replay_inputs[img_idx]
 
             image_shape = [replay_images.shape[1], replay_images.shape[2]]
             img = np.reshape(img, image_shape)
             ax.imshow(img, cmap='binary', vmin=0, vmax=1)
+          elif row_idx == 2:
+            img = self._all_replay_patterns[img_idx]
+
+            img = np.reshape(img, [pc_input_shape[1], pc_input_shape[2]])
+            ax.imshow(img, vmin=-1, vmax=1)
 
           ax.axis('off')
 
@@ -974,10 +994,21 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         losses['loss_pc_at_vc'] = np.square(self._test_inputs - pc_at_vc).mean()
 
     if self._consolidation_mode() and  self._all_replay_inputs:
+      labels_retrieved = np.argmax(self._all_replay_labels, axis=1)
+      labels_missing = np.setdiff1d(testing_fetched['labels'], labels_retrieved)
+      labels_unique = np.unique(labels_retrieved)
+
       losses['recalled_unseen'] = int(testing_fetched['labels'][0] in labels_retrieved)
-      losses['recalled_batch'] = int(len(labels_missing) == 0)
+      losses['recalled_batch'] = int(len(labels_missing) == 0)  # pylint: disable=len-as-condition
       losses['num_unique_recalled'] = len(labels_unique)
       losses['num_samples_recalled'] = len(labels_retrieved)
+      losses['num_samples_missing'] = len(labels_missing)
+
+      self._report_average_metric('recalled_unseen', losses['recalled_unseen'])
+      self._report_average_metric('recalled_batch', losses['recalled_batch'])
+      self._report_average_metric('num_unique_recalled', losses['num_unique_recalled'])
+      self._report_average_metric('num_samples_recalled', losses['num_samples_recalled'])
+      self._report_average_metric('num_samples_missing', losses['num_samples_missing'])
 
     return losses
 
