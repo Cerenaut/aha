@@ -88,8 +88,11 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
     # first_image
     (name, image, image_shape) = summary_images[0]
 
-    rows = len(summary_images) + 1 if col_nums else 0
+    rows = len(summary_images) + 2 + 1 if col_nums else 0
     cols = image_shape[0]  + 1 if row_nums else 0  # number of samples in batch
+
+    print('cols=', cols)
+    print('rows=', rows)
 
     if plot_encoding:
       # figsize = [18, 5.4]  # figure size, inches
@@ -115,6 +118,30 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
           ax.text(0.3, 0.3, ' ')
         else:
           ax.text(0.3, 0.3, str(row_idx+1))
+      elif row_idx in [rows - 2, rows - 3]:
+        if col_idx == 0:
+          ax.text(0.3, 0.3, ' ')
+        else:
+          img_idx = col_idx - 1
+
+          _, target_imgs, target_shape = summary_images[0]
+          target_shape = [target_shape[1], target_shape[2]]
+          _, output_imgs, _ = summary_images[5]
+
+          target_img = np.reshape(target_imgs[img_idx], target_shape)
+          output_img = np.reshape(output_imgs[img_idx], target_shape)
+          output_img = np.clip(output_img, 0.0, 1.0)
+
+          sq_err = np.square(target_img - output_img)
+
+          mse = sq_err.mean()
+          mse = '{:.2E}'.format(mse)
+
+          if row_idx == rows - 2:
+            ax.text(0.3, 0.3, mse, fontsize=5)
+          elif row_idx == rows - 3:
+            ax.imshow(sq_err)
+
       elif row_idx == rows - 1:
         if col_idx == 0:
           ax.text(0.3, 0.3, ' ')
