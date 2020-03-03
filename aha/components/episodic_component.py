@@ -51,6 +51,7 @@ from aha.components.deep_autoencoder_component import DeepAutoencoderComponent
 from aha.components.diff_plasticity_component import DifferentiablePlasticityComponent
 
 from aha.utils.interest_filter import InterestFilter
+from aha.utils.generic_utils import normalize_minmax
 
 
 class PCMode(enum.Enum):
@@ -333,6 +334,9 @@ class EpisodicComponent(CompositeComponent):
     """Build the label learning component for LTM."""
     ll_vc = None
 
+    train_input = normalize_minmax(train_input)
+    test_input = normalize_minmax(test_input)
+
     if self._hparams.ll_vc_type == 'fc':
       ll_vc = LabelLearnerFC()
       self._add_sub_component(ll_vc, name)
@@ -345,6 +349,9 @@ class EpisodicComponent(CompositeComponent):
   def _build_ll_pc(self, target_output, train_input, test_input, name='ll_pc'):
     """Build the label learning component for PC."""
     ll_pc = None
+
+    train_input = normalize_minmax(train_input)
+    test_input = normalize_minmax(test_input)
 
     if self._hparams.ll_pc_type == 'fc':
       ll_pc = LabelLearnerFC()

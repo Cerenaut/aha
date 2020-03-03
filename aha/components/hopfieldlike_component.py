@@ -603,14 +603,14 @@ class HopfieldlikeComponent(Component):
     # only update the relevant neurons
     y = self._neuron_update(input_size, x_fb, y_potential)
 
-    # Normalize Hopfield output
-    y = normalize_minmax(y)
+    # calculate Hopfield Energy
+    e = -0.5 * tf.matmul(tf.matmul(y, w), tf.transpose(y)) - tf.matmul(y, tf.transpose(x_direct))
 
     # 'decoding' for output in same dimensions as input, and for consistency with other components
     y_reshaped = tf.reshape(y, input_values_shape)
 
-    # calculate Hopfield Energy
-    e = -0.5 * tf.matmul(tf.matmul(y, w), tf.transpose(y)) - tf.matmul(y, tf.transpose(x_direct))
+    # Normalize the decoding output
+    y_reshaped = normalize_minmax(y_reshaped)
 
     # remember values for later use
     self._dual.set_op('w', w)
@@ -625,7 +625,8 @@ class HopfieldlikeComponent(Component):
     """Preprocess the inputs and build the pattern mapping components."""
 
     # map to input
-    pc_out = self._dual.get_op('y')  # output of Hopfield (PC)
+    # pc_out = self._dual.get_op('y')  # output of Hopfield (PC)
+    pc_out = self._dual.get_op('decoding')  # output of Hopfield (PC)
     # pc_out = normalize_minmax(pc_out)
 
     pc_target = self._dual.get_op('pr_target')
