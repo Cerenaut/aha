@@ -332,6 +332,7 @@ class HopfieldlikeComponent(Component):
     else:
       if self._use_input_cue:
         return self._dual.get_values('pr_out_direct')
+        #return self._dual.get_values('pr_out')
       else:
         return self._dual.get_values('x_direct')
 
@@ -809,6 +810,11 @@ class HopfieldlikeComponent(Component):
                    lambda: tf.nn.dropout(x_nn, keep_prob),
                    lambda: x_nn)
 
+    # Already normalized in episodic_component
+    #def normalize(x):
+    #  return (x - tf.reduce_min(x)) / (tf.reduce_max(x) - tf.reduce_min(x))
+    #x_nn = normalize(x_nn)
+
     self._dual.set_op('x_pr_memorise', x_nn)    # input to the pr path nn
 
     # Hidden layer[s]
@@ -880,7 +886,7 @@ class HopfieldlikeComponent(Component):
       raise RuntimeError("cue_nn_last_layer hparam option '{}' not implemented".format(last_layer))
 
     y = tf.stop_gradient(f)
-    pr_out_direct = y
+    #pr_out_direct = y
 
     if self._hparams.cue_nn_l2_regularizer > 0.0:
       all_losses = [loss]
@@ -920,25 +926,29 @@ class HopfieldlikeComponent(Component):
       # 5 / 5 * 20 = 
       # 1/5 = 0.2
       # 5 * 0.2 * 20 = 20
+      # This sum norm is like a softmax on the classification - the mass must be evenly distributed
       if self._hparams.cue_nn_sum_norm > 0.0:
         logging.info('PR Sum-norm enabled')
         y_sum = tf.reduce_sum(y, axis=1, keepdims=True)
         reciprocal = 1.0 / y_sum + 0.0000000000001
         y = y * reciprocal * self._hparams.cue_nn_sum_norm
 
-      # Softmax norm
+      # Softmax norm DEFAULT: false
       if self._hparams.cue_nn_softmax is True:
         logging.info('PR Softmax enabled')
         y = tf.nn.softmax(y)
         #y = y * 50.0  # Softmax makes the output *very* small. This hurts Hopfield reconstruction.
 
-      # After norm, 
+      # After norm DEFAULT: 1.0 (no gain)
       if self._hparams.cue_nn_gain != 1.0:
         logging.info('PR Gain enabled')
         y = y * self._hparams.cue_nn_gain
 
       # Range shift from unit to signed unit
       pr_out = y  # Unit range
+
+      # This would be a better point to tee.
+      pr_out_direct = y
 
       z_cue_in = unit_to_pc_linear(y)  # Theoretical range limits -1 : 1
       target_sparsity = self._hparams.cue_nn_label_sparsity
