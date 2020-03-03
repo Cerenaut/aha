@@ -331,7 +331,7 @@ class HopfieldlikeComponent(Component):
       return self._dual.get_values('x_ext')
     else:
       if self._use_input_cue:
-        return self._dual.get_values('pr_out')
+        return self._dual.get_values('pr_out_direct')
       else:
         return self._dual.get_values('x_direct')
 
@@ -880,6 +880,7 @@ class HopfieldlikeComponent(Component):
       raise RuntimeError("cue_nn_last_layer hparam option '{}' not implemented".format(last_layer))
 
     y = tf.stop_gradient(f)
+    pr_out_direct = y
 
     if self._hparams.cue_nn_l2_regularizer > 0.0:
       all_losses = [loss]
@@ -970,7 +971,8 @@ class HopfieldlikeComponent(Component):
       z_cue_in = unit_to_pc_sparse(pr_out)          # convert all 0's to -1 for Hopfield
       z_cue_shift = z_cue_in
 
-    self._dual.set_op('pr_out', pr_out)             # raw output of cue_nn
+    self._dual.set_op('pr_out_direct', pr_out_direct)  # raw output of cue_nn
+    self._dual.set_op('pr_out', pr_out)             # output of cue_nn after conditioning for PC in retrieval mode
     self._dual.set_op('z_cue_in', z_cue_in)         # modified to pc range and type (binary or real)
     self._dual.set_op('z_cue', z_cue_shift)         # modified to pc range and type (binary or real)
     self._dual.set_op('t_nn', t_nn)                 # Target for NN
@@ -1125,7 +1127,7 @@ class HopfieldlikeComponent(Component):
 
   def add_training_fetches(self, fetches):
 
-    names = ['loss_memorise', 'y', 'z_cue', 'pr_out', 'x_direct', 'x_ext']
+    names = ['loss_memorise', 'y', 'z_cue', 'pr_out', 'pr_out_direct', 'x_direct', 'x_ext']
 
     if self._is_pinv():
       names.extend(['y_memorise', 'w'])   # need y_memorise to ensure w is assigned
@@ -1148,7 +1150,7 @@ class HopfieldlikeComponent(Component):
 
   def set_training_fetches(self, fetched):
 
-    names = ['loss_memorise', 'y', 'z_cue', 'pr_out', 'x_direct', 'x_ext']
+    names = ['loss_memorise', 'y', 'z_cue', 'pr_out', 'pr_out_direct', 'x_direct', 'x_ext']
 
     if self._is_pinv():
       names.extend(['w'])
@@ -1177,7 +1179,7 @@ class HopfieldlikeComponent(Component):
 
   def add_encoding_fetches(self, fetches):
 
-    names = ['decoding', 'y', 'z_cue', 'pr_out', 'x_direct', 'x_ext']
+    names = ['decoding', 'y', 'z_cue', 'pr_out', 'pr_out_direct', 'x_direct', 'x_ext']
 
     if self._is_pinv():
       names.extend(['w'])
@@ -1196,7 +1198,7 @@ class HopfieldlikeComponent(Component):
     self._dual.add_fetches(fetches, names)
 
   def set_encoding_fetches(self, fetched):
-    names = ['decoding', 'y', 'z_cue', 'pr_out', 'x_direct', 'x_ext']
+    names = ['decoding', 'y', 'z_cue', 'pr_out', 'pr_out_direct', 'x_direct', 'x_ext']
 
     if self._is_pinv():
       names.extend(['w'])
