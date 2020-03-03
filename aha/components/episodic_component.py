@@ -334,8 +334,9 @@ class EpisodicComponent(CompositeComponent):
     """Build the label learning component for LTM."""
     ll_vc = None
 
-    train_input = normalize_minmax(train_input)
-    test_input = normalize_minmax(test_input)
+    # Don't normalize this yet
+    # train_input = normalize_minmax(train_input)
+    # test_input = normalize_minmax(test_input)
 
     if self._hparams.ll_vc_type == 'fc':
       ll_vc = LabelLearnerFC()
