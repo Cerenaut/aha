@@ -192,6 +192,7 @@ class HopfieldlikeComponent(Component):
         pm_train_with_noise=0.0,
         pm_train_with_noise_pp=0.0,
 
+        cue_nn_learning_rate=0.0001,  # 1.0=off: dropout in nn that learns the cue from EC
         cue_nn_train_dropout_keep_prob=1.0,  # 1.0=off: dropout in nn that learns the cue from EC
         cue_nn_test_with_noise=0.0,       # 0.0=off: noise to EC for testing generalisation of learning cue with nn
         cue_nn_train_with_noise=0.0,      # 0.0=off: noise to EC for testing generalisation of learning cue with nn
@@ -1072,7 +1073,7 @@ class HopfieldlikeComponent(Component):
     self._dual.set_op('z_cue_memorise', z_cue_memorise)
     self._dual.set_op('pr_loss', pr_loss)
 
-  def _build_optimizer(self, loss_op, training_op_name, scope=None):
+  def _build_optimizer(self, loss_op, training_op_name, scope=None, learning_rate=None):
     """Minimise loss using initialised a tf.train.Optimizer."""
 
     logging.info("-----------> Adding optimiser for op %s", loss_op)
@@ -1083,21 +1084,25 @@ class HopfieldlikeComponent(Component):
       scope = 'optimizer'
 
     with tf.variable_scope(scope):
-      optimizer = self._setup_optimizer()
+      optimizer = self._setup_optimizer(learning_rate)
       training = optimizer.minimize(loss_op, global_step=tf.train.get_or_create_global_step())
 
       self._dual.set_op(training_op_name, training)
 
-  def _setup_optimizer(self):
+  def _setup_optimizer(self, learning_rate=None):
     """Initialise the Optimizer class specified by a hyperparameter."""
+    optimizer_learning_rate = self._hparams.learning_rate  # Default
+    if learning_rate is not None:
+      optimizer_learning_rate = learning_rate
+
     if self._hparams.optimizer == 'adam':
-      logging.debug('Adam Opt., Hopfield learning rate: ' + str(self._hparams.learning_rate))
-      optimizer = tf.train.AdamOptimizer(self._hparams.learning_rate)
+      logging.debug('Adam Opt., Hopfield learning rate: ' + str(optimizer_learning_rate))
+      optimizer = tf.train.AdamOptimizer(optimizer_learning_rate)
     elif self._hparams.optimizer == 'momentum':
-      optimizer = tf.train.MomentumOptimizer(self._hparams.learning_rate, self._hparams.momentum,
+      optimizer = tf.train.MomentumOptimizer(optimizer_learning_rate, self._hparams.momentum,
                                              use_nesterov=self._hparams.momentum_nesterov)
     elif self._hparams.optimizer == 'sgd':
-      optimizer = tf.train.GradientDescentOptimizer(self._hparams.learning_rate)
+      optimizer = tf.train.GradientDescentOptimizer(optimizer_learning_rate)
     else:
       raise NotImplementedError('Optimizer not implemented: ' + str(self._hparams.optimizer))
 
