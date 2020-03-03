@@ -89,7 +89,7 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
     (name, image, image_shape) = summary_images[0]
 
     rows = len(summary_images)
-    rows = rows + 2 if plot_encoding
+    rows = rows + 2 if plot_encoding else 0
     rows = rows + 1 if col_nums else 0
     cols = image_shape[0]  + 1 if row_nums else 0  # number of samples in batch
 
