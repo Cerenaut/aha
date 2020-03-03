@@ -88,11 +88,9 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
     # first_image
     (name, image, image_shape) = summary_images[0]
 
-    print(col_nums, len(summary_images))
-    rows = len(summary_images) + 2
-    print(rows)
+    rows = len(summary_images)
+    rows = rows + 2 if plot_encoding
     rows = rows + 1 if col_nums else 0
-    print(rows)
     cols = image_shape[0]  + 1 if row_nums else 0  # number of samples in batch
 
     print('cols=', cols)
@@ -122,7 +120,7 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
           ax.text(0.3, 0.3, ' ')
         else:
           ax.text(0.3, 0.3, str(row_idx+1))
-      elif row_idx in [rows - 2, rows - 3]:
+      elif plot_encoding and row_idx in [rows - 2, rows - 3]:
         if col_idx == 0:
           ax.text(0.3, 0.3, ' ')
         else:
@@ -151,7 +149,6 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
           ax.text(0.3, 0.3, ' ')
         else:
           ax.text(0.3, 0.3, str(col_idx))
-          # ax.set_title(name + str(col_idx))
       else:
         (name, image, image_shape) = summary_images[row_idx]
         image_shape = [image_shape[1], image_shape[2]]
@@ -159,19 +156,12 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
         img_idx = col_idx - 1
         img = np.reshape(image[img_idx], image_shape)
 
-        # if col_idx == 0:
-        #   ax.text(-20, 10, name, fontsize=7)
-
         if not plot_encoding or row_idx in [0, 2, 5]:
           ax.imshow(img, cmap='binary', vmin=0, vmax=1)
         else:
           ax.imshow(img, vmin=-1, vmax=1)
 
-        # write row/col indices as axes' title for identification
-        # ax.set_title(name + str(col_idx))
       ax.axis('off')
-
-    # plt.tight_layout(pad=0.1, h_pad=0.1, w_pad=0.1)
 
     if save_figs:
       filetype = 'png'
