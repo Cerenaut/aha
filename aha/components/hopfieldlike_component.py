@@ -1547,7 +1547,7 @@ class HopfieldlikeComponent(Component):
     vars_nets = []
 
     # Selectively include/exclude optimizer parameters
-    optim_pr = False
+    optim_pr = True
     optim_pm = False
     optim_pm_raw = True
 
