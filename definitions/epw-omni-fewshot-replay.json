@@ -4,7 +4,7 @@
     "dataset": "aha.datasets.omniglot_unseen_oneshot_dataset",
     "component": "aha.components.episodic_component",
 
-    "checkpoint": "/home/incubator/agief-remote-run/aha/run/200224-0612/summaries_20200224-061253/",
+    "checkpoint": "/home/incubator/agief-remote-run/storage/checkpoints/episodic/summaries_20200303-125645",
     "checkpoint_load_scope": "episodic/vc, episodic/pc, episodic/ll_pc, episodic/ll_vc",
     "checkpoint_frozen_scope": "episodic/vc, episodic/dg, episodic/pc, episodic/ll_pc",
 
@@ -159,7 +159,7 @@
     "num_repeats": 6,
     "num_replays": 5,
     "consolidation_steps": 1,
-    "random_recall": "pc",
+    "random_recall": "pr",
     "replay_buffer_threshold": 100.0,
 
     "evaluate": true,

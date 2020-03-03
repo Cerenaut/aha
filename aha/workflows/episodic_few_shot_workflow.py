@@ -670,6 +670,10 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     # from skimage.measure import compare_ssim
 
     if self._build_replay_dataset():
+      filtered_replay_inputs = []
+      filtered_replay_labels = []
+      filtered_replay_patterns = []
+
       replay_inputs = np.reshape(testing_fetched['pc']['ec_out_raw'], self._dataset.shape)
       replay_images = replay_inputs
 
@@ -721,19 +725,17 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
           append = True
 
         if append:
+          filtered_replay_inputs.append(replay_inputs[i])
           self._all_replay_inputs.append(replay_inputs[i])
-          self._all_replay_patterns.append(replay_patterns[i])
-          self._all_replay_labels.append(replay_labels[i])
 
-          # print('Sample # =', i, 'Label = ', np.max(label), np.argmax(label))
+          filtered_replay_patterns.append(replay_patterns[i])
+          self._all_replay_patterns.append(replay_patterns[i])
+
+          filtered_replay_labels.append(replay_labels[i])
+          self._all_replay_labels.append(replay_labels[i])
 
         self._replay_inputs.append(replay_inputs[i])
         self._replay_labels.append(replay_labels[i])
-
-        # # Do a big-loop iteration after we collect all images or on final replay step
-        # if (self._replay_step + 1) % (self._opts['num_replays'] - 1) == 0 or (
-        #     len(self._all_replay_inputs) == self._hparams.batch_size):
-        #   self._big_loop = True
 
       # interval = self._opts['num_replays']
       interval = 1
@@ -802,7 +804,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         plt.clf()
 
         rows = 3
-        cols = len(self._all_replay_inputs)
+        cols = len(filtered_replay_inputs)
         _, ax = plt.subplots(nrows=rows, ncols=cols, figsize=[10, 2], num=test_step)
         plt.subplots_adjust(left=0, right=1.0, bottom=0, top=1.0, hspace=0.1, wspace=0.1)
 
@@ -815,17 +817,17 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
           img_idx = col_idx
 
           if row_idx == 1:
-            label_idx = np.argmax(self._all_replay_labels[img_idx])
+            label_idx = np.argmax(filtered_replay_labels[img_idx])
             label_real = self._dataset.eval_classes[label_idx]
             ax.text(0.3, 0.3, str(label_real), fontsize=9)
           elif row_idx == 0:
-            img = self._all_replay_inputs[img_idx]
+            img = filtered_replay_inputs[img_idx]
 
             image_shape = [replay_images.shape[1], replay_images.shape[2]]
             img = np.reshape(img, image_shape)
             ax.imshow(img, cmap='binary', vmin=0, vmax=1)
           elif row_idx == 2:
-            img = self._all_replay_patterns[img_idx]
+            img = filtered_replay_patterns[img_idx]
 
             img = np.reshape(img, [pc_input_shape[1], pc_input_shape[2]])
             ax.imshow(img, vmin=-1, vmax=1)
