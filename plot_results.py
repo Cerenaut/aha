@@ -144,9 +144,11 @@ def main():
 
   models = {'aha': {}, 'ae': {}}
 
-  exp = 'instance'  # oneshot or instance
+  exp = 'oneshot'  # oneshot or instance
   metric = 'class'  # class or replay
-  perturb = 'noise'  # occ or noise
+  perturb = 'occ'  # occ or noise
+
+  print('Mode =', exp, metric, perturb, '\n')
 
   for model in models.keys():
     dirpath = os.path.join(input_path, model + '-' + exp + '-' + 'class' + '-' + perturb)
@@ -240,6 +242,11 @@ def main():
                  dashes=(2, 1),
                  with_range=True,
                  alpha=0.1)
+    print('\n')
+    print('LTM Accuracy =', models['aha']['results_stats'][vc_key].mean[0], models['aha']['results_stats'][vc_key].se[0])
+    print('LTM+AHA-PC Accuracy =', models['aha']['results_stats'][pc_key].mean[0], models['aha']['results_stats'][pc_key].se[0])
+    print('LTM+AHA-PR Accuracy =', models['aha']['results_stats'][pr_key].mean[0], models['aha']['results_stats'][pr_key].se[0])
+    print('LTM+FastAE Accuracy =', models['ae']['results_stats'][ae_key].mean[0], models['ae']['results_stats'][ae_key].se[0])
 
     ax.set_ylabel(ylabel)
     ax.legend(loc='upper right')
@@ -249,6 +256,8 @@ def main():
 
   elif metric == 'replay':
     replay_key = 'acc_mse_pm_raw'
+
+    single_plot = True
 
     aha_color = 'red'
     plot_mean_sd(ax, xaxis,
@@ -263,11 +272,14 @@ def main():
                  with_range=True,
                  alpha=0.1)
 
-    ax.set_ylabel(ylabel, color=aha_color)
-    ax.tick_params(axis='y', labelcolor=aha_color)
-    ax.legend(loc='upper left')
+    if not single_plot:
+      ax.set_ylabel(ylabel, color=aha_color)
+      ax.tick_params(axis='y', labelcolor=aha_color)
+      ax.legend(loc='upper left')
 
-    ax2 = ax.twinx()
+      ax2 = ax.twinx()
+    else:
+      ax2 = ax
 
     ae_color = 'green'
     plot_mean_sd(ax2, xaxis,
@@ -281,9 +293,17 @@ def main():
                  with_range=(None, None),
                  alpha=0.1)
 
-    ax2.set_ylabel(ylabel, color=ae_color)
-    ax2.tick_params(axis='y', labelcolor=ae_color)
-    ax2.legend(loc='upper right')
+    print('\n')
+    print('LTM+AHA Replay Loss =', models['aha']['results_stats'][replay_key].mean[0], models['aha']['results_stats'][replay_key].se[0])
+    print('LTM+FastAE Repaly Loss =', models['ae']['results_stats'][replay_key].mean[0], models['ae']['results_stats'][replay_key].se[0])
+
+    if not single_plot:
+      ax2.set_ylabel(ylabel, color=ae_color)
+      ax2.tick_params(axis='y', labelcolor=ae_color)
+      ax2.legend(loc='upper right')
+    else:
+      ax.set_ylabel(ylabel)
+      ax.legend(loc='upper right')
 
   ax.set_title(title)
 
