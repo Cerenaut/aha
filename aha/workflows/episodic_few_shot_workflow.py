@@ -535,12 +535,15 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
                 self._unseen_labels.append(replay_labels[idx])
 
           # Only override if we've found unseen in the buffer
-          if len(unseen_inputs) >= 1:
+          if len(self._unseen_inputs) >= 1:
             unseen_input, unseen_label = self._random_sample(self._unseen_inputs, self._unseen_labels, 1)
 
             # Override first index with unseen sample
             batch_inputs[0] = unseen_input
             batch_labels[0] = unseen_label
+
+            print('Unseen Label:', self._unseen_label)
+            print('Batch Labels:', np.argmax(batch_labels, axis=1))
 
         feed_dict.update({
             self._component.get_dual().get_pl('replay'): True,
@@ -693,8 +696,6 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
     if self._build_replay_dataset():
       self._unseen_label = testing_fetched['labels'][0]
-
-      print('Unseen Label:', self._unseen_label)
 
       filtered_replay_inputs = []
       filtered_replay_labels = []

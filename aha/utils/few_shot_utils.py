@@ -93,9 +93,6 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
     rows = rows + 1 if col_nums else 0
     cols = image_shape[0]  + 1 if row_nums else 0  # number of samples in batch
 
-    print('cols=', cols)
-    print('rows=', rows)
-
     if plot_encoding:
       # figsize = [18, 5.4]  # figure size, inches
       figsize = [10, 3]  # figure size, inches
