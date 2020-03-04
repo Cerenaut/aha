@@ -434,6 +434,8 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         if (self._replay_step + 1) % self._opts['num_replays'] == 0:
           print('Finish Recall, starting consolidation...\n')
           self._consolidation_step = 0
+          self._unseen_inputs = []
+          self._unseen_labels = []
           finished_recall = True
 
         self._replay_step += 1
