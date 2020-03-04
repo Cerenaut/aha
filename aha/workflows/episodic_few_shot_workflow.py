@@ -165,6 +165,11 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     self._load_next_checkpoint = 0
     self._run_ended = True
 
+    self._unseen_label = None
+    self._unseen_inputs = []
+    self._unseen_labels = []
+
+
   def _test_consistency(self):
     super()._test_consistency()
 
@@ -484,14 +489,14 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
   def _consolidation_mode(self):
     return self._replay_mode() and not self._build_replay_dataset()
 
-  def _random_sample(self, inputs, labels):
+  def _random_sample(self, inputs, labels, batch_size):
     """Random sample with duplicates."""
     batch_inputs = []
     batch_labels = []
 
     size = len(inputs)
 
-    for i in range(self._hparams.batch_size):
+    for i in range(batch_size):
       idx = np.random.choice(np.arange(size), 1, replace=False)[0]
       batch_inputs.append(inputs[idx])
       batch_labels.append(labels[idx])
@@ -509,14 +514,33 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         assert len(self._all_replay_inputs) == len(self._all_replay_labels)
 
         random_sample = True
+        force_unseen = True
 
         if random_sample:
           replay_inputs, replay_labels = self._replay_preprocess(self._all_replay_inputs, self._all_replay_labels)
 
-          batch_inputs, batch_labels = self._random_sample(replay_inputs, replay_labels)
+          batch_inputs, batch_labels = self._random_sample(replay_inputs, replay_labels, self._hparams.batch_size)
         else:
           batch_inputs = np.array(self._all_replay_inputs)
           batch_labels = np.array(self._all_replay_labels)
+
+        if force_unseen:
+          # Get unseen samples in the buffer
+          if not self._unseen_inputs:
+            for idx, soft_labels in enumerate(replay_labels):
+              hard_label = np.argmax(soft_labels)
+
+              if hard_label == self._unseen_label:
+                self._unseen_inputs.append(replay_inputs[idx])
+                self._unseen_labels.append(replay_labels[idx])
+
+          # Only override if we've found unseen in the buffer
+          if len(unseen_inputs) >= 1:
+            unseen_input, unseen_label = self._random_sample(self._unseen_inputs, self._unseen_labels, 1)
+
+            # Override first index with unseen sample
+            batch_inputs[0] = unseen_input
+            batch_labels[0] = unseen_label
 
         feed_dict.update({
             self._component.get_dual().get_pl('replay'): True,
@@ -667,9 +691,11 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     self._testing_features = self._extract_features(testing_fetched)
     self._test_inputs = testing_fetched['test_inputs']
 
-    # from skimage.measure import compare_ssim
-
     if self._build_replay_dataset():
+      self._unseen_label = testing_fetched['labels'][0]
+
+      print('Unseen Label:', self._unseen_label)
+
       filtered_replay_inputs = []
       filtered_replay_labels = []
       filtered_replay_patterns = []
