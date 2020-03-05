@@ -54,7 +54,7 @@
     "test_classes": [],
     "batch_all_classes": false,
     "batch_no_duplicates": false,
-    "degrade_type": "none",
+    "degrade_type": "circle",
     "degrade_step": "none",
     "completion_gain": 1.0,
     "train_recurse": false,

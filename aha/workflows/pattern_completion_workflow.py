@@ -239,6 +239,9 @@ class PatternCompletionWorkflow(Workflow):
 
         the_dataset = the_dataset.shuffle(buffer_size=10000, seed=(self._seed+seed_increment))
 
+      if self._opts['evaluate_mode'][0] == 'simple' and self._opts['evaluate_mode'][1].startswith('run'):
+        the_dataset = the_dataset.shuffle(buffer_size=10000, seed=(self._seed+seed_increment))
+
       if invert_images:
         the_dataset = the_dataset.map(lambda x, y: tf_invert(x, y))
 

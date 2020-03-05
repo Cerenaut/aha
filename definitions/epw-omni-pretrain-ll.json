@@ -1,7 +1,7 @@
 {
   "experiment-options": {
     "workflow": "aha.workflows.episodic_few_shot_workflow",
-    "dataset": "aha.datasets.omniglot_supervised_dataset",
+    "dataset": "aha.datasets.omniglot_lakelike_runs_dataset",
     "component": "aha.components.episodic_component",
 
     "checkpoint": "/home/incubator/agief-remote-run/storage/checkpoints/episodic/summaries_20190516-110659/model.ckpt-2000",
@@ -10,14 +10,14 @@
 
     "logging": "info",
     "seed": 4,
-    "batches": 2000,
+    "batches": 1000,
 
     "summarize": true,
     "track": true,
     "tb_debug": false,
 
     "hparams_override": {
-      "batch_size": 128,
+      "batch_size": 64,
       "output_features": "vc",
       "pc_type": "none",
       "dg_type": "none",
@@ -34,7 +34,7 @@
       "max_outputs": 3,
 
       "vc_num_layers": 1,
-      "vc_batch_size": 128,
+      "vc_batch_size": 64,
       "vc_learning_rate": [0.001],
       "vc_sparsity": [4],
       "vc_sparsity_output_factor": [1.0],
@@ -52,7 +52,7 @@
       "vc_summarize_level": [1],
       "vc_max_outputs": [3],
 
-      "ifi_batch_size": 128,
+      "ifi_batch_size": 64,
       "ifi_num_features": 15,
       "ifi_scale_range": [1.0],
       "ifi_pe_size": 15,
@@ -65,7 +65,7 @@
       "ifi_summarize_level": 1,
       "ifi_max_outputs": 3,
 
-      "ll_vc_batch_size": 128,
+      "ll_vc_batch_size": 64,
       "ll_vc_hidden_size": 0,
       "ll_vc_learning_rate": 0.001,
       "ll_vc_l2_regularizer": 0.0,
@@ -89,12 +89,12 @@
     "batch_all_classes": false,
     "batch_no_duplicates": false,
 
-    "degrade_type": "none",
+    "degrade_type": "circle",
     "degrade_step": "none",
     "degrade_factor": 0.0,
     "degrade_value": 0,
 
-    "noise_type": "none",
+    "noise_type": "sp_float",
     "noise_step": "none",
     "noise_factor": 0.0,
 
@@ -104,7 +104,7 @@
     "rsummary_batches": 0,
     "visualise_vc": false,
     "visualise_if_at_vc": false,
-    "evaluate_mode": ["simple"],
+    "evaluate_mode": ["simple", "run01"],
     "evaluate_supermode": "none",
     "summarize_completion": "to_file"
   }

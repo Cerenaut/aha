@@ -10,7 +10,7 @@
 
     "logging": "info",
     "seed": 42,
-    "batches": 6,
+    "batches": 8,
 
     "summarize": true,
     "track": true,
@@ -156,9 +156,9 @@
     "export_filters": false
   },
   "workflow-options": {
-    "num_repeats": 6,
-    "num_replays": 5,
-    "consolidation_steps": 1,
+    "num_repeats": 4,
+    "num_replays": 2,
+    "consolidation_steps": 2,
     "random_recall": "pr",
     "replay_buffer_threshold": 100.0,
 

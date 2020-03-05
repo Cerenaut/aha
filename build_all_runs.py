@@ -1,11 +1,14 @@
-#For each run:
-#- Pick 1 file from each parent dir (alphabet) for train
-#- Pick 1 file from each parent dir (alphabet) for test
+# For each run:
+# - Pick 1 file from each parent dir (alphabet) for train
+# - Pick 1 file from each parent dir (alphabet) for test
 
 import os
 import random
 import logging
-from pprint import pprint
+
+from pathlib import Path
+from shutil import copyfile
+
 
 OUTPUT_PATH = './data/omniglot/all_runs_unseen'
 unseen_image_folder = './data/omniglot/images_evaluation_unseen'
@@ -17,6 +20,7 @@ IGNORE_LIST = ['.DS_Store']
 UNSEEN_CLASS_MAP = {}
 SUPERVISED_CLASS_MAP = {}
 
+os.environ['PYTHONHASHSEED'] = str(SEED)
 random.seed(SEED)
 
 for subset in os.listdir(supervised_image_folder):
@@ -46,7 +50,8 @@ for subset in os.listdir(supervised_image_folder):
               character_label = int(character_files[0].split('_')[0])
               SUPERVISED_CLASS_MAP[subset][family][character] = character_files
       else:
-        logging.warning('Path to alphabet is not a directory: %s', os.path.join(supervised_image_folder, subset, family))
+        logging.warning('Path to alphabet is not a directory: %s',
+                        os.path.join(supervised_image_folder, subset, family))
   else:
     logging.warning('Path to subset is not a directory: %s', os.path.join(supervised_image_folder, subset))
 
@@ -75,9 +80,6 @@ num_seen = 19
 
 ALL_RUNS = {}
 
-from pathlib import Path
-from shutil import copyfile
-
 for run_idx in range(1, num_runs + 1):
   run_folder = 'run' + str(run_idx).zfill(2)
 
@@ -101,7 +103,6 @@ for run_idx in range(1, num_runs + 1):
     train_sample_path = os.path.join(unseen_image_folder, alphabet, random_char, train_sample)
     test_sample_path = os.path.join(unseen_image_folder, alphabet, random_char, test_sample)
 
-    print(train_sample_path)
     ALL_RUNS[run_folder]['training'].append(train_sample_path)
     ALL_RUNS[run_folder]['test'].append(test_sample_path)
 
@@ -133,7 +134,7 @@ for run_folder in ALL_RUNS:
   for i, char_path in enumerate(ALL_RUNS[run_folder]['training']):
     filename = os.path.basename(char_path)
     character_label = int(filename.split('_')[0])
-    new_filename = 'class' + str(i + 1).zfill(2) + '_' + str(character_label) + '.png'
+    new_filename = str(i + 1).zfill(2) + '_' + str(character_label) + '.png'
     copyfile(char_path, os.path.join(train_folder_path, new_filename))
 
   test_folder_path = os.path.join(run_folder_path, 'test')
@@ -142,5 +143,5 @@ for run_folder in ALL_RUNS:
   for i, char_path in enumerate(ALL_RUNS[run_folder]['test']):
     filename = os.path.basename(char_path)
     character_label = int(filename.split('_')[0])
-    new_filename = 'item' + str(i + 1).zfill(2) + '_' + str(character_label) + '.png'
+    new_filename = str(i + 1).zfill(2) + '_' + str(character_label) + '.png'
     copyfile(char_path, os.path.join(test_folder_path, new_filename))

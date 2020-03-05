@@ -1,16 +1,16 @@
 {
   "experiment-options": {
     "workflow": "aha.workflows.episodic_few_shot_workflow",
-    "dataset": "aha.datasets.omniglot_unseen_oneshot_dataset",
+    "dataset": "aha.datasets.omniglot_lakelike_runs_dataset",
     "component": "aha.components.episodic_component",
 
-    "checkpoint": "/home/incubator/agief-remote-run/storage/checkpoints/episodic/summaries_20191029-164825/model.ckpt-2000",
+    "checkpoint": "/home/incubator/agief-remote-run/aha/run/summaries_20200306-084137/model.ckpt-1000",
     "checkpoint_load_scope": "episodic/vc, episodic/ll_vc",
     "checkpoint_frozen_scope": "episodic/vc, episodic/ll_vc, episodic/dg",
 
     "logging": "info",
     "seed": 42,
-    "batches": 800,
+    "batches": 40,
 
     "summarize": true,
     "track": true,
