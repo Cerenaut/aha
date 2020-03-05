@@ -118,14 +118,20 @@ class OmniglotUnseenRunsDataset(Dataset):
     Return train and test files and labels for ONE given run, specified in `folder`
     """
 
-
     def extract_labels(files):
       labels = []
       for file in files:
         file, _ = os.path.splitext(file)
         label = int(file.split('_')[1])
         labels.append(label)
-      return labels
+      labels = np.array(labels)
+
+      label_idx_arr = np.zeros_like(labels, dtype=np.int32)
+
+      for i, label in enumerate(labels):
+        label_idx_arr[i] = self.eval_classes.index(label)
+
+      return label_idx_arr
 
     train_folder_path = os.path.join(folder, 'training')
     test_folder_path = os.path.join(folder, 'test')
@@ -139,6 +145,9 @@ class OmniglotUnseenRunsDataset(Dataset):
     test_files.sort()
 
     test_labels = extract_labels(test_files)
+
+    print(test_labels)
+    print(self._eval_classes[test_labels])
 
     test_files = [folder + '/../' + file for file in test_files]
     train_files = [folder + '/../' + file for file in train_files]
@@ -154,3 +163,22 @@ class OmniglotUnseenRunsDataset(Dataset):
     dataset = tf.data.Dataset.from_tensor_slices((filenames, labels))
     dataset = dataset.map(parse_function, num_parallel_calls=4)
     return dataset
+
+  def _filenames_and_labels(self, image_folder):
+    """Get the image filename and label for each Omniglot character."""
+    eval_folder = os.path.join(self._directory, self.name, 'images_evaluation')
+    _, eval_labels = super()._filenames_and_labels(eval_folder)
+
+    self.eval_classes = list(np.unique(eval_labels))
+
+    filename_arr, label_arr = super()._filenames_and_labels(image_folder)
+
+    label_idx_arr = np.zeros_like(label_arr, dtype=np.int32)
+    for i, label in enumerate(label_arr):
+      label_idx_arr[i] = self.eval_classes.index(label)
+
+    # Since this dataset is a subset of images_evaluation, the labels extracted from filenames
+    # won't be one-hot encodable (as its missing the full set of classes).
+    # We use the label indices as a pseudo label in order to one-hot the labels for learning.
+
+    return filename_arr, label_idx_arr
