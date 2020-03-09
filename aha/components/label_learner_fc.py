@@ -161,6 +161,11 @@ class LabelLearnerFC(SummaryComponent):
       unseen_sum = 1
       unseen_idxs = (0, unseen_sum)
 
+      # if name == 'll_vc':
+        # labels = tf.Print(labels, [tf.argmax(labels, 1)], 'labels=', summarize=20)
+        # preds = tf.Print(preds, [tf.argmax(preds, 1)], 'preds=', summarize=20)
+
+
       correct_predictions = tf.equal(tf.argmax(preds, 1), tf.argmax(labels, 1))
       correct_predictions = tf.cast(correct_predictions, tf.float32)
 
@@ -177,7 +182,7 @@ class LabelLearnerFC(SummaryComponent):
       if self._hparams.l2_regularizer > 0.0:
         all_losses = [loss]
 
-        for weight in weights:
+        for i, weight in enumerate(weights):
           weight_loss = tf.nn.l2_loss(weight)
           weight_loss_sum = tf.reduce_sum(weight_loss)
           weight_loss_scaled = weight_loss_sum * self._hparams.l2_regularizer

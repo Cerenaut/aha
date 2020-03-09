@@ -66,16 +66,16 @@
       "ifi_max_outputs": 3,
 
       "ll_vc_batch_size": 64,
-      "ll_vc_hidden_size": 0,
+      "ll_vc_hidden_size": 128,
       "ll_vc_learning_rate": 0.001,
-      "ll_vc_l2_regularizer": 0.0,
+      "ll_vc_l2_regularizer": 0.0004,
       "ll_vc_train_input_dropout_keep_prob": 1.0,
-      "ll_vc_train_hidden_dropout_keep_prob": 1.0
+      "ll_vc_train_hidden_dropout_keep_prob": 0.5
     }
   },
   "export-options": {
     "export_filters": true,
-    "interval_batches": 1000
+    "interval_batches": 100
   },
   "workflow-options": {
     "num_repeats": 1,

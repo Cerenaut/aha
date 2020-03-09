@@ -127,7 +127,6 @@ class OmniglotLakelikeRunsDataset(OmniglotDataset):
 
       run_path = os.path.join(images_folder, run_folder, self._exp_mode)
 
-      print(run_path)
       test_files, test_labels, train_files, train_labels = self._data_run_folder(run_path)
 
       self._train_files.extend(train_files)
@@ -193,4 +192,5 @@ class OmniglotLakelikeRunsDataset(OmniglotDataset):
     eval_folder = os.path.join(self._directory, self.name, 'images_evaluation')
     _, eval_labels = super()._filenames_and_labels(eval_folder)
 
+    print(eval_labels[:20])
     self.eval_classes = list(np.unique(eval_labels))

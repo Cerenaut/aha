@@ -103,7 +103,7 @@ class EpisodicWorkflow(CompositeWorkflow):
     labels = self._labels
 
     if labels.dtype != tf.string:
-      self._labels = tf.Print(self._labels, [self._labels], summarize=self._hparams.batch_size)
+      # self._labels = tf.Print(self._labels, [self._labels], summarize=self._hparams.batch_size)
       labels = tf.one_hot(self._labels, self._dataset.num_classes)
 
     self._component.build(self._inputs, self._dataset.shape, self._hparams,

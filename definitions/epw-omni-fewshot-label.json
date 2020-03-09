@@ -4,7 +4,7 @@
     "dataset": "aha.datasets.omniglot_lakelike_runs_dataset",
     "component": "aha.components.episodic_component",
 
-    "checkpoint": "/home/incubator/agief-remote-run/aha/run/summaries_20200306-084137/model.ckpt-1000",
+    "checkpoint": "/home/incubator/agief-remote-run/aha/run/summaries_20200309-114247/model.ckpt-1000",
     "checkpoint_load_scope": "episodic/vc, episodic/ll_vc",
     "checkpoint_frozen_scope": "episodic/vc, episodic/ll_vc, episodic/dg",
 
@@ -133,12 +133,12 @@
       "ifi_summarize_level": 1,
       "ifi_max_outputs": 3,
 
-      "ll_vc_batch_size": 20,
-      "ll_vc_hidden_size": 0,
+      "ll_vc_batch_size": 64,
+      "ll_vc_hidden_size": 128,
       "ll_vc_learning_rate": 0.001,
-      "ll_vc_l2_regularizer": 0.0,
+      "ll_vc_l2_regularizer": 0.0004,
       "ll_vc_train_input_dropout_keep_prob": 1.0,
-      "ll_vc_train_hidden_dropout_keep_prob": 1.0,
+      "ll_vc_train_hidden_dropout_keep_prob": 0.5,
 
       "ll_pc_batch_size": 20,
       "ll_pc_hidden_size": 800,
