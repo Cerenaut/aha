@@ -60,7 +60,7 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
   render_subplots = True    # with Matplotlib
 
   plot_encoding = True
-  plot_diff = True
+  plot_diff = False
 
   if len(summary_images) == 3:  #  3 images -> train_input, test_input, recon (i.e. no encoding)
     plot_encoding = False
