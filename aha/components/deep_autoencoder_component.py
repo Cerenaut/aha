@@ -55,7 +55,7 @@ class DeepAutoencoderComponent(AutoencoderComponent):
         pm_type='none',               # Not relevant; use pm_raw_type
         pm_raw_type='none',           # 'none' or 'nn': map stable PC patterns back to VC input (image space)
         pm_l1_size=100,               # hidden layer of PM path (pattern mapping)
-        pm_raw_l1_size=100,
+        pm_raw_hidden_size=[100],
         pm_raw_l2_regularizer=0.0,
         pm_raw_nonlinearity='leaky_relu',
         pm_noise_type='s',            # 's' for salt, 'sp' for salt + pepper
@@ -314,7 +314,7 @@ class DeepAutoencoderComponent(AutoencoderComponent):
       ec_in = self._input_cue
       output_nonlinearity = type_activation_fn('leaky_relu')
       ec_out = self._build_pm_core(x=x_nn, target=ec_in,
-                                   l1_size=self._hparams.pm_l1_size,
+                                   hidden_size=self._hparams.pm_l1_size,
                                    non_linearity1=tf.nn.leaky_relu,
                                    non_linearity2=output_nonlinearity,
                                    loss_fn=tf.losses.mean_squared_error)
@@ -324,7 +324,7 @@ class DeepAutoencoderComponent(AutoencoderComponent):
       ec_in = self._input_cue_raw
       output_nonlinearity = type_activation_fn(self._hparams.pm_raw_nonlinearity)
       ec_out_raw = self._build_pm_core(x=x_nn, target=ec_in,
-                                       l1_size=self._hparams.pm_raw_l1_size,
+                                       hidden_size=self._hparams.pm_raw_hidden_size,
                                        non_linearity1=tf.nn.leaky_relu,
                                        non_linearity2=output_nonlinearity,
                                        loss_fn=tf.losses.mean_squared_error,
@@ -332,7 +332,7 @@ class DeepAutoencoderComponent(AutoencoderComponent):
       self._dual.set_op('ec_out_raw', ec_out_raw)
 
 
-  def _build_pm_core(self, x, target, l1_size, non_linearity1, non_linearity2, loss_fn, name_suffix=""):
+  def _build_pm_core(self, x, target, hidden_size, non_linearity1, non_linearity2, loss_fn, name_suffix=""):
     """Build the layers of the PM network, with optional L2 regularization."""
     target_shape = target.get_shape().as_list()
     target_size = np.prod(target_shape[1:])
@@ -341,22 +341,24 @@ class DeepAutoencoderComponent(AutoencoderComponent):
     weights = []
     scope = 'pm' + name_suffix
     with tf.variable_scope(scope):
-      y1_layer = tf.layers.Dense(units=l1_size, activation=non_linearity1)
-      y1 = y1_layer(x)
+      out = x
 
-      self._dual.set_op('encoding', tf.stop_gradient(y1))
-      self._dual.set_op('decoding', tf.stop_gradient(y1))
+      # Build encoding layers
+      for num_units in hidden_size:
+        hidden_layer = tf.layers.Dense(units=num_units, activation=non_linearity1)
+        out = hidden_layer(out)
 
-      keep_prob = self._hparams.pm_train_dropout_hidden_keep_prob
-      y1 = tf.cond(tf.equal(self._batch_type, 'training'),
-                   lambda: tf.nn.dropout(y1, keep_prob),
-                   lambda: y1)
+        weights.append(hidden_layer.weights[0])
+        weights.append(hidden_layer.weights[1])
 
+      # Store final hidden state
+      self._dual.set_op('encoding', tf.stop_gradient(out))
+      self._dual.set_op('decoding', tf.stop_gradient(out))
+
+      # Build output layer
       f_layer = tf.layers.Dense(units=l2_size, activation=non_linearity2)
-      f = f_layer(y1)
+      f = f_layer(out)
 
-      weights.append(y1_layer.weights[0])
-      weights.append(y1_layer.weights[1])
       weights.append(f_layer.weights[0])
       weights.append(f_layer.weights[1])
 
@@ -365,6 +367,7 @@ class DeepAutoencoderComponent(AutoencoderComponent):
 
     target_flat = tf.reshape(target, shape=[-1, target_size])
     loss = loss_fn(f, target_flat)
+
     self._dual.set_op('loss', loss)
     self._dual.set_op('pm_loss' + name_suffix, loss)
 

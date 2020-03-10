@@ -10,7 +10,7 @@
 
     "logging": "info",
     "seed": 5,
-    "batches": 60,
+    "batches": 2400,
 
     "summarize": true,
     "track": true,
@@ -67,8 +67,7 @@
       "pc_dae_learning_rate": 0.01,
       "pc_dae_pm_type": "none",
       "pc_dae_pm_raw_type": "nn",
-      "pc_dae_pm_l1_size": 100,
-      "pc_dae_pm_raw_l1_size": 100,
+      "pc_dae_pm_raw_hidden_size": [100],
       "pc_dae_pm_raw_l2_regularizer": 0.00004,
       "pc_dae_pm_train_dropout_input_keep_prob": 1.0,
       "pc_dae_pm_train_dropout_hidden_keep_prob": 1.0,
@@ -82,7 +81,7 @@
     "export_filters": false
   },
   "workflow-options": {
-    "num_repeats": 60,
+    "num_repeats": 120,
     "evaluate": true,
     "invert_images": false,
     "resize_images_factor": 0.5,
