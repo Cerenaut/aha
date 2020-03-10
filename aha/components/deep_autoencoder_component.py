@@ -61,6 +61,8 @@ class DeepAutoencoderComponent(AutoencoderComponent):
         pm_noise_type='s',            # 's' for salt, 'sp' for salt + pepper
         pm_train_with_noise=0.0,
         pm_train_with_noise_pp=0.0,
+        pm_train_dropout_input_keep_prob=1.0,
+        pm_train_dropout_hidden_keep_prob=1.0,
 
         optimizer='adam',
         momentum=0.9,
@@ -214,57 +216,63 @@ class DeepAutoencoderComponent(AutoencoderComponent):
 
     self._dual.set_op('inputs', self._input_values)
 
-    input_shape = self._input_values.get_shape().as_list()
-    output_shape = np.prod(input_shape[1:])
+    # input_shape = self._input_values.get_shape().as_list()
+    # output_shape = np.prod(input_shape[1:])
 
-    kernel_initializer = build_kernel_initializer('xavier')
+    # kernel_initializer = build_kernel_initializer('xavier')
 
-    assert self._hparams.num_layers == len(self._hparams.filters)
-    assert self._hparams.num_layers == len(self._hparams.nonlinearity)
+    # assert self._hparams.num_layers == len(self._hparams.filters)
+    # assert self._hparams.num_layers == len(self._hparams.nonlinearity)
 
-    with tf.variable_scope('encoder'):
-      encoder_output = tf.layers.flatten(self._input_values)
+    # with tf.variable_scope('encoder'):
+    #   encoder_output = tf.layers.flatten(self._input_values)
 
-      print('input', encoder_output)
-      for i in range(self._hparams.num_layers):
-        encoder_output = tf.layers.dense(encoder_output, self._hparams.filters[i],
-                                         activation=type_activation_fn(self._hparams.nonlinearity[i]),
-                                         kernel_initializer=kernel_initializer)
-        print('encoder', i, encoder_output)
+    #   print('input', encoder_output)
+    #   for i in range(self._hparams.num_layers):
+    #     encoder_output = tf.layers.dense(encoder_output, self._hparams.filters[i],
+    #                                      activation=type_activation_fn(self._hparams.nonlinearity[i]),
+    #                                      kernel_initializer=kernel_initializer)
+    #     print('encoder', i, encoder_output)
 
-      self._dual.set_op('encoding', tf.stop_gradient(encoder_output))
+    #   self._dual.set_op('encoding', tf.stop_gradient(encoder_output))
 
-    with tf.variable_scope('decoder'):
-      decoder_output = encoder_output
-      decoder_filters = self._hparams.filters[:-1][::-1]  # Remove last filter (bottleneck), reverse filters
-      decoder_filters += [output_shape]
+    # with tf.variable_scope('decoder'):
+    #   decoder_output = encoder_output
+    #   decoder_filters = self._hparams.filters[:-1][::-1]  # Remove last filter (bottleneck), reverse filters
+    #   decoder_filters += [output_shape]
 
-      decoder_nonlinearity = self._hparams.nonlinearity[:-1][::-1]
-      decoder_nonlinearity += [self._hparams.output_nonlinearity]
+    #   decoder_nonlinearity = self._hparams.nonlinearity[:-1][::-1]
+    #   decoder_nonlinearity += [self._hparams.output_nonlinearity]
 
-      for i in range(self._hparams.num_layers):
-        decoder_output = tf.layers.dense(encoder_output, decoder_filters[i],
-                                         activation=type_activation_fn(decoder_nonlinearity[i]),
-                                         kernel_initializer=kernel_initializer)
-        print('decoder', i, decoder_output)
+    #   for i in range(self._hparams.num_layers):
+    #     decoder_output = tf.layers.dense(encoder_output, decoder_filters[i],
+    #                                      activation=type_activation_fn(decoder_nonlinearity[i]),
+    #                                      kernel_initializer=kernel_initializer)
+    #     print('decoder', i, decoder_output)
 
-      output = tf.reshape(decoder_output, [-1] + input_shape[1:])
-      print('output', output)
+    #   output = tf.reshape(decoder_output, [-1] + input_shape[1:])
+    #   print('output', output)
 
-      self._dual.set_op('decoding', output)
-      self._dual.set_op('output', tf.stop_gradient(output))
+    #   self._dual.set_op('decoding', output)
+    #   self._dual.set_op('output', tf.stop_gradient(output))
 
-    # Build loss and optimizer
-    loss = self._build_loss_fn(self._input_values, output)
-    self._dual.set_op('loss', loss)
-    self._build_optimizer(loss, 'training', scope='ae')
+    # # Build loss and optimizer
+    # loss = self._build_loss_fn(self._input_values, output)
+    # self._dual.set_op('loss', loss)
+    # self._build_optimizer(loss, 'training', scope='ae')
 
   def _build_pm(self):
     """Preprocess the inputs and build the pattern mapping components."""
 
+    def normalize(x):
+      return (x - tf.reduce_min(x)) / (tf.reduce_max(x) - tf.reduce_min(x))
+
     # map to input
-    x_nn = self._dual.get_op('output')  # output of Deep AE
+    # x_nn = self._dual.get_op('output')  # output of Deep AE
+    x_nn = self._dual.get_op('inputs')
     x_nn = tf.layers.flatten(x_nn)
+
+    x_nn = normalize(x_nn)
 
     # Apply noise during training, to regularise / test generalisation
     # --------------------------------------------------------------------------
@@ -293,6 +301,12 @@ class DeepAutoencoderComponent(AutoencoderComponent):
 
     else:
       raise NotImplementedError('PM noise type not supported: ' + str(self._hparams.noise_type))
+
+     # apply dropout during training
+    keep_prob = self._hparams.pm_train_dropout_input_keep_prob
+    x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
+                   lambda: tf.nn.dropout(x_nn, keep_prob),
+                   lambda: x_nn)
 
     # Build PM
     # --------------------------------------------------------------------------
@@ -330,6 +344,14 @@ class DeepAutoencoderComponent(AutoencoderComponent):
       y1_layer = tf.layers.Dense(units=l1_size, activation=non_linearity1)
       y1 = y1_layer(x)
 
+      self._dual.set_op('encoding', tf.stop_gradient(y1))
+      self._dual.set_op('decoding', tf.stop_gradient(y1))
+
+      keep_prob = self._hparams.pm_train_dropout_hidden_keep_prob
+      y1 = tf.cond(tf.equal(self._batch_type, 'training'),
+                   lambda: tf.nn.dropout(y1, keep_prob),
+                   lambda: y1)
+
       f_layer = tf.layers.Dense(units=l2_size, activation=non_linearity2)
       f = f_layer(y1)
 
@@ -339,9 +361,11 @@ class DeepAutoencoderComponent(AutoencoderComponent):
       weights.append(f_layer.weights[1])
 
       y = tf.stop_gradient(f)   # ensure gradients don't leak into other nn's in PC
+      self._dual.set_op('output', y)
 
     target_flat = tf.reshape(target, shape=[-1, target_size])
     loss = loss_fn(f, target_flat)
+    self._dual.set_op('loss', loss)
     self._dual.set_op('pm_loss' + name_suffix, loss)
 
     if self._hparams.pm_raw_l2_regularizer > 0.0:
@@ -446,7 +470,8 @@ class DeepAutoencoderComponent(AutoencoderComponent):
     })
 
   def add_training_fetches(self, fetches):
-    names = ['loss', 'training', 'encoding', 'decoding', 'inputs']
+    # names = ['loss', 'training', 'encoding', 'decoding', 'inputs']
+    names = ['loss', 'encoding', 'decoding', 'inputs']
 
     if self._use_pm_raw:
       names.extend(['training_pm_raw', 'ec_out_raw'])
@@ -550,7 +575,8 @@ class DeepAutoencoderComponent(AutoencoderComponent):
   def _build_summaries(self):
     """Build the summaries for TensorBoard."""
 
-    summarise_stuff = ['general', 'pm']
+    # summarise_stuff = ['general', 'pm']
+    summarise_stuff = ['pm']
 
     max_outputs = self._hparams.max_outputs
     summaries = []

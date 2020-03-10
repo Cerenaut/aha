@@ -465,7 +465,12 @@ class EpisodicComponent(CompositeComponent):
       raise NotImplementedError('Pattern completer not implemented: ' + pc_type)
 
     pc_output = pc.get_decoding_op()
-    pc_output_shape = input_next_vis_shape  # output is same shape and size as input
+
+    if pc_type == 'dae':
+      input_volume = np.prod(pc_output.get_shape().as_list()[1:])
+      pc_output_shape, _ = image_utils.square_image_shape_from_1d(input_volume)
+    else:
+      pc_output_shape = input_next_vis_shape  # output is same shape and size as input
 
     return pc_output, pc_output_shape
 
