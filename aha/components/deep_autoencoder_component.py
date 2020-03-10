@@ -62,7 +62,7 @@ class DeepAutoencoderComponent(AutoencoderComponent):
         pm_train_with_noise=0.0,
         pm_train_with_noise_pp=0.0,
         pm_train_dropout_input_keep_prob=1.0,
-        pm_train_dropout_hidden_keep_prob=1.0,
+        pm_train_dropout_hidden_keep_prob=[1.0],
 
         optimizer='adam',
         momentum=0.9,
@@ -302,7 +302,7 @@ class DeepAutoencoderComponent(AutoencoderComponent):
     else:
       raise NotImplementedError('PM noise type not supported: ' + str(self._hparams.noise_type))
 
-     # apply dropout during training
+    # apply dropout during training
     keep_prob = self._hparams.pm_train_dropout_input_keep_prob
     x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
                    lambda: tf.nn.dropout(x_nn, keep_prob),
@@ -342,14 +342,20 @@ class DeepAutoencoderComponent(AutoencoderComponent):
     scope = 'pm' + name_suffix
     with tf.variable_scope(scope):
       out = x
+      keep_prob = self._hparams.pm_train_dropout_hidden_keep_prob
 
       # Build encoding layers
-      for num_units in hidden_size:
+      for i, num_units in enumerate(hidden_size):
         hidden_layer = tf.layers.Dense(units=num_units, activation=non_linearity1)
         out = hidden_layer(out)
 
         weights.append(hidden_layer.weights[0])
         weights.append(hidden_layer.weights[1])
+
+        # apply dropout during training
+        out = tf.cond(tf.equal(self._batch_type, 'training'),
+                      lambda: tf.nn.dropout(out, keep_prob[i]),
+                      lambda: out)
 
       # Store final hidden state
       self._dual.set_op('encoding', tf.stop_gradient(out))

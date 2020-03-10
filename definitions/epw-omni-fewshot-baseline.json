@@ -70,7 +70,7 @@
       "pc_dae_pm_raw_hidden_size": [100],
       "pc_dae_pm_raw_l2_regularizer": 0.00004,
       "pc_dae_pm_train_dropout_input_keep_prob": 1.0,
-      "pc_dae_pm_train_dropout_hidden_keep_prob": 1.0,
+      "pc_dae_pm_train_dropout_hidden_keep_prob": [1.0],
       "pc_dae_pm_train_with_noise": 0.00,
       "pc_dae_pm_train_with_noise_pp": 0.00,
       "pc_dae_pm_raw_nonlinearity": "leaky_relu",
