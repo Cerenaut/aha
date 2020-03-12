@@ -101,7 +101,7 @@
       "pc_hl_pm_train_with_noise": 0.0,
       "pc_hl_pm_train_with_noise_pp": 0.0,
 
-      "pc_hl_cue_nn_learning_rate":0.01,
+      "pc_hl_cue_nn_learning_rate": 0.01,
       "pc_hl_cue_nn_train_dropout_keep_prob": 0.75,
       "pc_hl_cue_nn_train_with_noise": 0.05,
       "pc_hl_cue_nn_train_with_noise_pp": 0.005,
@@ -116,7 +116,7 @@
       "pc_hl_cue_nn_gain": 1.0,
       "pc_hl_cue_nn_sum_norm": 10.0,
       "pc_hl_cue_nn_l2_regularizer": 0.000025,
-      "pc_hl_summarize_level": 0,
+      "pc_hl_summarize_level": 1,
       "pc_hl_max_outputs": 1,
 
       "ifi_batch_size": 20,
@@ -159,13 +159,13 @@
 
     "train_recurse": false,
     "test_recurse": true,
-    "recurse_iterations": 1,
+    "recurse_iterations": 70,
     "rsummary_batches": 0,
     "visualise_vc": false,
     "visualise_if_at_vc": false,
     "evaluate_mode": ["oneshot"],
     "evaluate_supermode": "none",
-    "summarize_completion": "to_file"
+    "summarize_completion": "none"
   },
   "parameter-sweeps": {
     "workflow-options": [],
