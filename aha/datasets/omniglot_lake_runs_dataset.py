@@ -127,11 +127,7 @@ class OmniglotLakeRunsDataset(Dataset):
     self._test_files = []
     self._test_labels = []
 
-    #my_list = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
-    # need to test first 6-7 to see improvement
-    my_list = [13,14,19,10,3,12,1,2,4,5,6,7,8,9,11,15,16,17,18,20]
-    #for r in range(1, num_runs + 1):
-    for r in my_list:
+    for r in range(1, num_runs + 1):
       rs = str(r)
       if len(rs) == 1:
         rs = '0' + rs
