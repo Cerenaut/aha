@@ -180,7 +180,6 @@ def main(_):
     all_values = list(chunks(values, num_seeds + 1))
 
     num_items = len(all_values[0])
-    print(num_items)
 
     thresh = None
 
