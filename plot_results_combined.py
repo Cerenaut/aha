@@ -142,7 +142,7 @@ def get_filenames(dirpath):
 def plot_mean_sd(ax, xaxis, vals, ses, sd, label, color, mins, maxs, dashes=(None, None), alpha=0.08,
                  with_range=False):
   """Plot with optional error shadows."""
-  print(label, "-> SD = %.3f," % sd, "Best mean = %.3f," % vals.max(), "Best max = %.3f" % maxs.max())
+  # print(label, "-> SD = %.3f," % sd, "Best mean = %.3f," % vals.max(), "Best max = %.3f" % maxs.max())
 
   LW = 0.7
   ax.plot(xaxis, vals, label=label, c=color, dashes=dashes, linewidth=LW)
@@ -168,9 +168,9 @@ def main(_):
   print('Models =', model_names)
   print('Mode =', exp, metric, perturb, '\n')
 
-  models = dict.fromkeys(model_names, {})
+  models = {}
 
-  for model in models:
+  for model in model_names:
     filename = model + '-' + exp + '-' + 'class' + '-' + perturb + '.log'
     filepath = os.path.join(input_path, filename)
 
@@ -181,10 +181,9 @@ def main(_):
 
     num_items = len(all_values[0])
 
-    thresh = None
-
+    models[model] = {}
     models[model]['results'] = concatenate_results(all_headings, all_values)
-    models[model]['results_stats'] = compute_statistics(models[model]['results'], thresh)
+    models[model]['results_stats'] = compute_statistics(models[model]['results'])
 
   xaxes = build_xaxis(num_items)
   xaxis = xaxes['diameter']
@@ -204,7 +203,7 @@ def main(_):
     ylabel = 'Accuracy'
     ymax = 1.0
   elif metric == 'replay':
-    ylabel = 'Replay Loss'
+    ylabel = 'Recall Loss'
     # ymax = 0.3
     ymax = None
 
@@ -249,8 +248,6 @@ def main(_):
                    with_range=True,
                    alpha=0.1)
 
-      print('\n')
-
       print('LTM Accuracy =',
             models['aha']['results_stats'][vc_key].mean[0],
             models['aha']['results_stats'][vc_key].se[0])
@@ -270,7 +267,7 @@ def main(_):
       plot_mean_sd(ax, xaxis,
                    vals=models['ae']['results_stats'][ae_key].mean,
                    ses=models['ae']['results_stats'][ae_key].se,
-                   sd=models['ae']['results_stats'][ae_key].sd, label='LTM+FastAE',
+                   sd=models['ae']['results_stats'][ae_key].sd, label='LTM+FastNN',
                    mins=models['ae']['results_stats'][ae_key].mins,
                    maxs=models['ae']['results_stats'][ae_key].maxs,
                    color='green',
@@ -278,8 +275,7 @@ def main(_):
                    with_range=True,
                    alpha=0.1)
 
-      print('\n')
-      print('LTM+FastAE Accuracy =',
+      print('LTM+FastNN Accuracy =',
             models['ae']['results_stats'][ae_key].mean[0],
             models['ae']['results_stats'][ae_key].se[0])
 
@@ -309,12 +305,9 @@ def main(_):
                    with_range=True,
                    alpha=0.1)
 
-      print('\n')
-      print('LTM+AHA Replay Loss =',
+      print('LTM+AHA Recall Loss =',
             models['aha']['results_stats'][replay_key].mean[0],
-
             models['aha']['results_stats'][replay_key].se[0])
-
 
     if not single_plot:
       ax.set_ylabel(ylabel, color=aha_color)
@@ -327,17 +320,17 @@ def main(_):
 
     if 'ae' in models:
       plot_mean_sd(ax2, xaxis,
-                  vals=models['ae']['results_stats'][replay_key].mean,
-                  ses=models['ae']['results_stats'][replay_key].se,
-                  sd=models['ae']['results_stats'][replay_key].sd, label='LTM+FastAE',
-                  mins=models['ae']['results_stats'][replay_key].mins,
-                  maxs=models['ae']['results_stats'][replay_key].maxs,
-                  color=ae_color,
-                  dashes=(2, 1),
-                  with_range=(None, None),
-                  alpha=0.1)
+                   vals=models['ae']['results_stats'][replay_key].mean,
+                   ses=models['ae']['results_stats'][replay_key].se,
+                   sd=models['ae']['results_stats'][replay_key].sd, label='LTM+FastNN',
+                   mins=models['ae']['results_stats'][replay_key].mins,
+                   maxs=models['ae']['results_stats'][replay_key].maxs,
+                   color=ae_color,
+                   dashes=(2, 1),
+                   with_range=(None, None),
+                   alpha=0.1)
 
-      print('LTM+FastAE Repaly Loss =',
+      print('LTM+FastNN Recall Loss =',
             models['ae']['results_stats'][replay_key].mean[0],
             models['ae']['results_stats'][replay_key].se[0])
 
