@@ -270,7 +270,7 @@ def main(_):
       plot_mean_sd(ax, xaxis,
                    vals=models['ae']['results_stats'][ae_key].mean,
                    ses=models['ae']['results_stats'][ae_key].se,
-                   sd=models['ae']['results_stats'][ae_key].sd, label='LTM+FastNN',
+                   sd=models['ae']['results_stats'][ae_key].sd, label='LTM+S-NN',
                    mins=models['ae']['results_stats'][ae_key].mins,
                    maxs=models['ae']['results_stats'][ae_key].maxs,
                    color='green',
@@ -278,7 +278,7 @@ def main(_):
                    with_range=True,
                    alpha=0.1)
 
-      print('LTM+FastNN Accuracy =',
+      print('LTM+S-NN Accuracy =',
             models['ae']['results_stats'][ae_key].mean[0],
             models['ae']['results_stats'][ae_key].se[0])
 
@@ -325,7 +325,7 @@ def main(_):
       plot_mean_sd(ax2, xaxis,
                    vals=models['ae']['results_stats'][replay_key].mean,
                    ses=models['ae']['results_stats'][replay_key].se,
-                   sd=models['ae']['results_stats'][replay_key].sd, label='LTM+FastNN',
+                   sd=models['ae']['results_stats'][replay_key].sd, label='LTM+S-NN',
                    mins=models['ae']['results_stats'][replay_key].mins,
                    maxs=models['ae']['results_stats'][replay_key].maxs,
                    color=ae_color,
@@ -333,7 +333,7 @@ def main(_):
                    with_range=True,
                    alpha=0.1)
 
-      print('LTM+FastNN Recall Loss =',
+      print('LTM+S-NN Recall Loss =',
             models['ae']['results_stats'][replay_key].mean[0],
             models['ae']['results_stats'][replay_key].se[0])
 
