@@ -59,7 +59,7 @@ class OmniglotLakelikeRunsDataset(OmniglotDataset):
 
     elif self._evaluate_mode[0] == 'simple':
       self._exp_mode = 'supervised'
-      self._run_mode = self._evaluate_mode[1]
+      self._run_num = self._evaluate_mode[1]
       self._train_size = 8464
       self._test_size = 2116
 
