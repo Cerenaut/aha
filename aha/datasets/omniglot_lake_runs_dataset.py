@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-"""OmniglotLakeRunsDataset class.."""
+"""OmniglotLakeRunsDataset class."""
 
 import os
 import zipfile
@@ -32,7 +32,13 @@ from aha.datasets.omniglot_lake_dataset import OmniglotLakeDataset
 
 
 class OmniglotLakeRunsDataset(Dataset):
-  """Omniglot Dataset based on tf.data."""
+  """
+  Omniglot Dataset based on tf.data.
+
+  Used for Instance Learning (as opposed to the pre-set runs) in the standard test.
+  Returns batches of different exemplars of the same class.
+
+  """
 
   def __init__(self, directory, batch_size):
     super(OmniglotLakeRunsDataset, self).__init__(

@@ -81,7 +81,7 @@
     "num_repeats": 1,
     "train": false,
     "evaluate": true,
-    "invert_images": true,
+    "invert_images": false,
     "resize_images_factor": 0.5,
     "superclass": true,
     "class_proportion": 1.0,
