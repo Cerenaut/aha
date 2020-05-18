@@ -314,11 +314,66 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
   def _setup_checkpoint_saver(self):
     """Handles the saving and restoration of graph state and variables."""
+    max_to_keep = self._export_opts['max_to_keep']
+
+    def load_checkpoint(checkpoint_path):
+      # Loads a subset of the checkpoint, specified by variable scopes
+      if self._checkpoint_opts['checkpoint_load_scope']:
+        load_scope = []
+        init_scope = []
+
+        scope_list = self._checkpoint_opts['checkpoint_load_scope'].split(',')
+        for i, scope in enumerate(scope_list):
+          scope_list[i] = scope.lstrip().rstrip()
+
+        global_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+
+        for variable in global_variables:
+          # Add any variables that match the specified scope to a separate list
+          # Note: global_step is excluded and re-initialised, even if within scope
+          if variable.name.startswith(tuple(scope_list)) and 'global_step' not in variable.name:
+            load_scope.append(variable)
+          else:
+            init_scope.append(variable)
+
+        # Load variables from specified scope
+        saver = tf.train.Saver(load_scope)
+        self._restore_checkpoint(saver, checkpoint_path)
+
+        # Re-initialise any variables outside specified scope, including global_step
+        init_scope_op = tf.variables_initializer(init_scope, name='init')
+        self._session.run(init_scope_op)
+
+        # Switch to encoding mode if freezing loaded scope
+        if self._checkpoint_opts['checkpoint_frozen_scope']:
+          self._freeze_training = True
+
+        # Create new tf.Saver to save new checkpoints
+        self._saver = tf.train.Saver(max_to_keep=max_to_keep)
+        self._last_step = 0
+
+      # Otherwise, attempt to load the entire checkpoint
+      else:
+        self._saver = tf.train.Saver(max_to_keep=max_to_keep)
+        self._last_step = self._restore_checkpoint(self._saver, checkpoint_path)
 
     if not self._replay_mode():
-      return super()._setup_checkpoint_saver()
+      if 'model.ckpt' in self._checkpoint_opts['checkpoint_path']:
+        return super()._setup_checkpoint_saver()
 
-    max_to_keep = self._export_opts['max_to_keep']
+      # First call to this function by setup()
+      if self._load_next_checkpoint == 0:
+        self._saver = tf.train.Saver(max_to_keep=max_to_keep)
+        self._last_step = 0
+        return
+
+      folder_name = 'run' + str(self._load_next_checkpoint).zfill(2)
+      checkpoint_dir = os.path.join(self._checkpoint_opts['checkpoint_path'], folder_name)
+      checkpoint_path = tf.train.latest_checkpoint(checkpoint_dir)
+      print('Checkpoint Path =', checkpoint_path)
+
+      load_checkpoint(checkpoint_path)
+      return
 
     # First call to this function by setup()
     if self._load_next_checkpoint == 0:
@@ -330,45 +385,8 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     checkpoint_path = os.path.join(self._checkpoint_opts['checkpoint_path'], filename)
     print('Checkpoint Path =', checkpoint_path)
 
-    # Loads a subset of the checkpoint, specified by variable scopes
-    if self._checkpoint_opts['checkpoint_load_scope']:
-      load_scope = []
-      init_scope = []
+    load_checkpoint(checkpoint_path)
 
-      scope_list = self._checkpoint_opts['checkpoint_load_scope'].split(',')
-      for i, scope in enumerate(scope_list):
-        scope_list[i] = scope.lstrip().rstrip()
-
-      global_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-
-      for variable in global_variables:
-        # Add any variables that match the specified scope to a separate list
-        # Note: global_step is excluded and re-initialised, even if within scope
-        if variable.name.startswith(tuple(scope_list)) and 'global_step' not in variable.name:
-          load_scope.append(variable)
-        else:
-          init_scope.append(variable)
-
-      # Load variables from specified scope
-      saver = tf.train.Saver(load_scope)
-      self._restore_checkpoint(saver, checkpoint_path)
-
-      # Re-initialise any variables outside specified scope, including global_step
-      init_scope_op = tf.variables_initializer(init_scope, name='init')
-      self._session.run(init_scope_op)
-
-      # Switch to encoding mode if freezing loaded scope
-      if self._checkpoint_opts['checkpoint_frozen_scope']:
-        self._freeze_training = True
-
-      # Create new tf.Saver to save new checkpoints
-      self._saver = tf.train.Saver(max_to_keep=max_to_keep)
-      self._last_step = 0
-
-    # Otherwise, attempt to load the entire checkpoint
-    else:
-      self._saver = tf.train.Saver(max_to_keep=max_to_keep)
-      self._last_step = self._restore_checkpoint(self._saver, checkpoint_path)
 
   def run(self, num_batches, evaluate, train=True):
     """Run Experiment"""
@@ -395,6 +413,10 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         self._load_next_checkpoint += 40
         self._setup_checkpoint_saver()
         self._run_ended = False
+
+      if 'oneshot' in self._opts['evaluate_mode'] and batch % self._opts['num_repeats'] == 0:
+        self._load_next_checkpoint += 1
+        self._setup_checkpoint_saver()
 
       logging.debug("----------------- Batch: %s", str(batch))
       feed_dict = {}
