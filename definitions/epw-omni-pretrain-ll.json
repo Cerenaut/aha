@@ -79,7 +79,7 @@
   },
   "workflow-options": {
     "num_repeats": 1,
-    "train": false,
+    "train": true,
     "evaluate": true,
     "invert_images": false,
     "resize_images_factor": 0.5,
