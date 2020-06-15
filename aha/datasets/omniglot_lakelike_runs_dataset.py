@@ -49,7 +49,9 @@ class OmniglotLakelikeRunsDataset(OmniglotDataset):
     self._run_num = None
     self.eval_classes = []
 
-    if 'oneshot' not in self._evaluate_mode and 'simple' not in self._evaluate_mode:
+    compatible_modes = ['oneshot', 'simple', 'replay']
+
+    if any(x in compatible_modes for x in self._evaluate_mode):
       raise ValueError('Evaluate mode incompatible with dataset: ' + str(self._evaluate_mode))
 
     if self._evaluate_mode[0] in ['oneshot', 'replay']:
