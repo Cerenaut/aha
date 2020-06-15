@@ -52,7 +52,7 @@ class OmniglotLakelikeRunsDataset(OmniglotDataset):
     if 'oneshot' not in self._evaluate_mode and 'simple' not in self._evaluate_mode:
       raise ValueError('Evaluate mode incompatible with dataset: ' + str(self._evaluate_mode))
 
-    if self._evaluate_mode[0] == 'oneshot':
+    if self._evaluate_mode[0] in ['oneshot', 'replay']:
       self._exp_mode = 'oneshot'
       self._train_size = 400
       self._test_size = 400
