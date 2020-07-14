@@ -17,9 +17,9 @@ def main():
         'evaluate_mode': ['simple', run_folder]
     }
 
-    now = datetime.datetime.now()
-    summary_dir = 'summaries_' + now.strftime("%Y%m%d-%H%M%S") + '/'
-    summary_path = os.path.join('run', experiment_prefix, summary_dir)
+    # now = datetime.datetime.now()
+    # summary_dir = 'summaries_' + now.strftime("%Y%m%d-%H%M%S") + '/'
+    summary_path = os.path.join('run', experiment_prefix, run_folder)
 
     subprocess.call([
         'pagi',
