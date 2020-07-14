@@ -252,6 +252,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     if self._is_decoding_pc_at_dg():
       additional_decode += 1
 
+    if self._is_decoding_pc_at_vc():
+      additional_decode += 1
+
     test_recurse_iterations = self._opts['recurse_iterations']
 
     if self._replay_mode():
