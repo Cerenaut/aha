@@ -223,6 +223,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     additional_decode = 0
     if self._is_decoding_pc_at_dg():
       additional_decode += 1
+    
+    if self._is_decoding_pc_at_vc():
+       additional_decode += 1
 
     train_dataset, test_dataset = self._gen_datasets_with_options(self._opts['train_classes'],
                                                                   self._opts['test_classes'],
