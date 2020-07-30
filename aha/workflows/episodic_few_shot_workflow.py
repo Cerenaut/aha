@@ -223,9 +223,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     additional_decode = 0
     if self._is_decoding_pc_at_dg():
       additional_decode += 1
-    
+
     if self._is_decoding_pc_at_vc():
-       additional_decode += 1
+      additional_decode += 1
 
     train_dataset, test_dataset = self._gen_datasets_with_options(self._opts['train_classes'],
                                                                   self._opts['test_classes'],
@@ -242,7 +242,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
                                                                   recurse_test=self._is_inference_recursive(),
                                                                   num_batch_repeats=self._opts['num_repeats'],
                                                                   recurse_iterations=self._opts['recurse_iterations'],
-                                                                  additional_test_decodes=1,
+                                                                  additional_test_decodes=additional_decode,
                                                                   evaluate_step=self._opts['evaluate'],
                                                                   use_trainset_for_tests=same_train_and_test,
                                                                   invert_images=self._opts['invert_images'],
