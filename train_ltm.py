@@ -4,6 +4,7 @@ import os
 import datetime
 import subprocess
 
+SEED = 42
 NUM_RUNS = 20
 DEFINITION_PATH = 'definitions/epw-omni-pretrain-ll.json'
 
@@ -13,6 +14,11 @@ def main():
 
   for r in range(1, NUM_RUNS + 1):
     run_folder = 'run' + str(r).zfill(2)
+
+    experiment_opts_sweep = {
+        'seed': SEED
+    }
+
     workflow_opts_sweep = {
         'evaluate_mode': ['simple', run_folder]
     }
@@ -26,6 +32,7 @@ def main():
         'run',
         '--experiment_def=' + DEFINITION_PATH,
         '--workflow_opts_sweep=' + str(workflow_opts_sweep),
+        '--experiment_opts_sweep=' + str(experiment_opts_sweep),
         '--summary_dir=' + summary_path
     ])
 
