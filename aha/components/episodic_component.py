@@ -320,9 +320,15 @@ class EpisodicComponent(CompositeComponent):
       print('vc final pooled', input_values_next)
 
     # Optionally norm the output samples so that they are comparable to the next stage
+    def normalize_min_max_4d(x):
+      sample_mins = tf.reduce_min(x, axis=[1, 2, 3], keepdims=True)
+      sample_maxs = tf.reduce_max(x, axis=[1, 2, 3], keepdims=True)
+      return (x - sample_mins) / (sample_maxs - sample_mins)
+
     if self._hparams.vc_norm_per_sample:
       frobenius_norm = tf.sqrt(tf.reduce_sum(tf.square(input_values_next), axis=[1, 2, 3], keepdims=True))
       input_values_next = input_values_next / frobenius_norm
+      #input_values_next = normalize_min_max_4d(input_values_next)
 
     # Unpack the conv cells shape
     input_volume = np.prod(input_values_next.get_shape().as_list()[1:])
@@ -479,7 +485,12 @@ class EpisodicComponent(CompositeComponent):
       raise NotImplementedError('Pattern completer not implemented: ' + pc_type)
 
     pc_output = pc.get_decoding_op()
-    pc_output_shape = input_next_vis_shape  # output is same shape and size as input
+
+    if pc_type == 'dae':
+      input_volume = np.prod(pc_output.get_shape().as_list()[1:])
+      pc_output_shape, _ = image_utils.square_image_shape_from_1d(input_volume)
+    else:
+      pc_output_shape = input_next_vis_shape  # output is same shape and size as input
 
     return pc_output, pc_output_shape
 

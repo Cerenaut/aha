@@ -60,6 +60,7 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
   render_subplots = True    # with Matplotlib
 
   plot_encoding = True
+  plot_diff = False
 
   if len(summary_images) == 3:  #  3 images -> train_input, test_input, recon (i.e. no encoding)
     plot_encoding = False
@@ -89,8 +90,8 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
     (name, image, image_shape) = summary_images[0]
 
     rows = len(summary_images)
-    rows = rows + 2 if plot_encoding else 0
-    rows = rows + 1 if col_nums else 0
+    rows = rows + (2 if plot_diff else 0)
+    rows = rows + (1 if col_nums else 0)
     cols = image_shape[0]  + 1 if row_nums else 0  # number of samples in batch
 
     if plot_encoding:
@@ -117,7 +118,7 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
           ax.text(0.3, 0.3, ' ')
         else:
           ax.text(0.3, 0.3, str(row_idx+1))
-      elif plot_encoding and row_idx in [rows - 2, rows - 3]:
+      elif plot_diff and row_idx in [rows - 2, rows - 3]:
         if col_idx == 0:
           ax.text(0.3, 0.3, ' ')
         else:
@@ -125,7 +126,7 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
 
           _, target_imgs, target_shape = summary_images[0]
           target_shape = [target_shape[1], target_shape[2]]
-          _, output_imgs, _ = summary_images[5]
+          _, output_imgs, _ = summary_images[-1]
 
           target_img = np.reshape(target_imgs[img_idx], target_shape)
           output_img = np.reshape(output_imgs[img_idx], target_shape)
@@ -153,7 +154,7 @@ def add_completion_summary(summary_images, folder, summary, batch, save_figs):
         img_idx = col_idx - 1
         img = np.reshape(image[img_idx], image_shape)
 
-        if not plot_encoding or row_idx in [0, 2, 5]:
+        if not plot_encoding or name in ['vc_input', 'ec_out_raw']:
           ax.imshow(img, cmap='binary', vmin=0, vmax=1)
         else:
           ax.imshow(img, vmin=-1, vmax=1)

@@ -192,6 +192,7 @@ class HopfieldlikeComponent(Component):
         pm_train_with_noise=0.0,
         pm_train_with_noise_pp=0.0,
 
+        cue_nn_learning_rate=0.0001,  # 1.0=off: dropout in nn that learns the cue from EC
         cue_nn_train_dropout_keep_prob=1.0,  # 1.0=off: dropout in nn that learns the cue from EC
         cue_nn_test_with_noise=0.0,       # 0.0=off: noise to EC for testing generalisation of learning cue with nn
         cue_nn_train_with_noise=0.0,      # 0.0=off: noise to EC for testing generalisation of learning cue with nn
@@ -335,7 +336,8 @@ class HopfieldlikeComponent(Component):
       return self._dual.get_values('x_ext')
     else:
       if self._use_input_cue:
-        return self._dual.get_values('pr_out')
+        return self._dual.get_values('pr_out_direct')
+        #return self._dual.get_values('pr_out')
       else:
         return self._dual.get_values('x_direct')
 
@@ -852,6 +854,11 @@ class HopfieldlikeComponent(Component):
                    lambda: tf.nn.dropout(x_nn, keep_prob),
                    lambda: x_nn)
 
+    # Already normalized in episodic_component
+    #def normalize(x):
+    #  return (x - tf.reduce_min(x)) / (tf.reduce_max(x) - tf.reduce_min(x))
+    #x_nn = normalize(x_nn)
+
     self._dual.set_op('x_pr_memorise', x_nn)    # input to the pr path nn
 
     # Hidden layer[s]
@@ -923,6 +930,7 @@ class HopfieldlikeComponent(Component):
       raise RuntimeError("cue_nn_last_layer hparam option '{}' not implemented".format(last_layer))
 
     y = tf.stop_gradient(f)
+    #pr_out_direct = y
 
     if self._hparams.cue_nn_l2_regularizer > 0.0:
       all_losses = [loss]
@@ -965,25 +973,29 @@ class HopfieldlikeComponent(Component):
       # 5 / 5 * 20 = 
       # 1/5 = 0.2
       # 5 * 0.2 * 20 = 20
+      # This sum norm is like a softmax on the classification - the mass must be evenly distributed
       if self._hparams.cue_nn_sum_norm > 0.0:
         logging.info('PR Sum-norm enabled')
         y_sum = tf.reduce_sum(y, axis=1, keepdims=True)
         reciprocal = 1.0 / y_sum + 0.0000000000001
         y = y * reciprocal * self._hparams.cue_nn_sum_norm
 
-      # Softmax norm
+      # Softmax norm DEFAULT: false
       if self._hparams.cue_nn_softmax is True:
         logging.info('PR Softmax enabled')
         y = tf.nn.softmax(y)
         #y = y * 50.0  # Softmax makes the output *very* small. This hurts Hopfield reconstruction.
 
-      # After norm, 
+      # After norm DEFAULT: 1.0 (no gain)
       if self._hparams.cue_nn_gain != 1.0:
         logging.info('PR Gain enabled')
         y = y * self._hparams.cue_nn_gain
 
       # Range shift from unit to signed unit
       pr_out = y  # Unit range
+
+      # This would be a better point to tee.
+      pr_out_direct = y
 
       z_cue_in = unit_to_pc_linear(y)  # Theoretical range limits -1 : 1
       target_sparsity = self._hparams.cue_nn_label_sparsity
@@ -1016,7 +1028,8 @@ class HopfieldlikeComponent(Component):
       z_cue_in = unit_to_pc_sparse(pr_out)          # convert all 0's to -1 for Hopfield
       z_cue_shift = z_cue_in
 
-    self._dual.set_op('pr_out', pr_out)             # raw output of cue_nn
+    self._dual.set_op('pr_out_direct', pr_out_direct)  # raw output of cue_nn
+    self._dual.set_op('pr_out', pr_out)             # output of cue_nn after conditioning for PC in retrieval mode
     self._dual.set_op('z_cue_in', z_cue_in)         # modified to pc range and type (binary or real)
     self._dual.set_op('z_cue', z_cue_shift)         # modified to pc range and type (binary or real)
     self._dual.set_op('t_nn', t_nn)                 # Target for NN
@@ -1106,7 +1119,7 @@ class HopfieldlikeComponent(Component):
     self._dual.set_op('z_cue_memorise', z_cue_memorise)
     self._dual.set_op('pr_loss', pr_loss)
 
-  def _build_optimizer(self, loss_op, training_op_name, scope=None):
+  def _build_optimizer(self, loss_op, training_op_name, scope=None, learning_rate=None):
     """Minimise loss using initialised a tf.train.Optimizer."""
 
     logging.info("-----------> Adding optimiser for op %s", loss_op)
@@ -1117,21 +1130,25 @@ class HopfieldlikeComponent(Component):
       scope = 'optimizer'
 
     with tf.variable_scope(scope):
-      optimizer = self._setup_optimizer()
+      optimizer = self._setup_optimizer(learning_rate)
       training = optimizer.minimize(loss_op, global_step=tf.train.get_or_create_global_step())
 
       self._dual.set_op(training_op_name, training)
 
-  def _setup_optimizer(self):
+  def _setup_optimizer(self, learning_rate=None):
     """Initialise the Optimizer class specified by a hyperparameter."""
+    optimizer_learning_rate = self._hparams.learning_rate  # Default
+    if learning_rate is not None:
+      optimizer_learning_rate = learning_rate
+
     if self._hparams.optimizer == 'adam':
-      logging.debug('Adam Opt., Hopfield learning rate: ' + str(self._hparams.learning_rate))
-      optimizer = tf.train.AdamOptimizer(self._hparams.learning_rate)
+      logging.debug('Adam Opt., Hopfield learning rate: ' + str(optimizer_learning_rate))
+      optimizer = tf.train.AdamOptimizer(optimizer_learning_rate)
     elif self._hparams.optimizer == 'momentum':
-      optimizer = tf.train.MomentumOptimizer(self._hparams.learning_rate, self._hparams.momentum,
+      optimizer = tf.train.MomentumOptimizer(optimizer_learning_rate, self._hparams.momentum,
                                              use_nesterov=self._hparams.momentum_nesterov)
     elif self._hparams.optimizer == 'sgd':
-      optimizer = tf.train.GradientDescentOptimizer(self._hparams.learning_rate)
+      optimizer = tf.train.GradientDescentOptimizer(optimizer_learning_rate)
     else:
       raise NotImplementedError('Optimizer not implemented: ' + str(self._hparams.optimizer))
 
@@ -1177,7 +1194,7 @@ class HopfieldlikeComponent(Component):
 
   def add_training_fetches(self, fetches):
 
-    names = ['loss_memorise', 'y', 'z_cue', 'pr_out', 'x_direct', 'x_ext']
+    names = ['loss_memorise', 'y', 'z_cue', 'pr_out', 'pr_out_direct', 'x_direct', 'x_ext']
 
     if self._is_pinv():
       names.extend(['y_memorise', 'w'])   # need y_memorise to ensure w is assigned
@@ -1203,7 +1220,7 @@ class HopfieldlikeComponent(Component):
 
   def set_training_fetches(self, fetched):
 
-    names = ['loss_memorise', 'y', 'z_cue', 'pr_out', 'x_direct', 'x_ext']
+    names = ['loss_memorise', 'y', 'z_cue', 'pr_out', 'pr_out_direct', 'x_direct', 'x_ext']
 
     if self._is_pinv():
       names.extend(['w'])
@@ -1240,7 +1257,7 @@ class HopfieldlikeComponent(Component):
 
   def add_encoding_fetches(self, fetches):
 
-    names = ['decoding', 'y', 'z_cue', 'pr_out', 'x_direct', 'x_ext']
+    names = ['decoding', 'y', 'z_cue', 'pr_out', 'pr_out_direct', 'x_direct', 'x_ext']
 
     if self._is_pinv():
       names.extend(['w'])
@@ -1262,7 +1279,7 @@ class HopfieldlikeComponent(Component):
     self._dual.add_fetches(fetches, names)
 
   def set_encoding_fetches(self, fetched):
-    names = ['decoding', 'y', 'z_cue', 'pr_out', 'x_direct', 'x_ext']
+    names = ['decoding', 'y', 'z_cue', 'pr_out', 'pr_out_direct', 'x_direct', 'x_ext']
 
     if self._is_pinv():
       names.extend(['w'])
@@ -1619,7 +1636,7 @@ class HopfieldlikeComponent(Component):
     vars_nets = []
 
     # Selectively include/exclude optimizer parameters
-    optim_pr = False
+    optim_pr = True
     optim_pm = False
     optim_pm_raw = True
 

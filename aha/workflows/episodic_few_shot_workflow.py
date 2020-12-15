@@ -274,7 +274,6 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
                                                                   recurse_train=self._is_train_recursive(),
                                                                   recurse_test=self._is_inference_recursive(),
                                                                   num_batch_repeats=self._opts['num_repeats'],
-                                                                  # recurse_iterations=self._opts['recurse_iterations'],
                                                                   recurse_iterations=test_recurse_iterations,
                                                                   additional_test_decodes=additional_decode,
                                                                   evaluate_step=self._opts['evaluate'],
@@ -618,7 +617,12 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     self._training_features = self._extract_features(fetched)
 
     if self._component.is_build_pc():
-      self._training_features['pc'] = self._component.get_pc().get_input('training')      # target output is value to be memorised (the training input)
+      if self._hparams.pc_type != 'hl':
+        self._training_features['pc'] = self._component.get_pc().get_encoding()
+        # self._training_features['pc'] = self._component.get_pc().get_input('training')
+      else:
+        self._training_features['pc'] = self._component.get_pc().get_input('training')      # target output is value to be memorised (the training input)
+
       # self._training_features['pc_in'] = self._component.get_pc().get_input('encoding')   # NOTE: this is the output of the PR on the training set
       self._training_features['pc_in'] = self._component.get_pc().get_input('training')   # NOTE: this is the target (provided by DG), this is not the PR output because it is in 'training' mode.
 
@@ -1027,13 +1031,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         vc_input_flat = np.reshape(vc_input, [vc_input.shape[0], np.prod(vc_input.shape[1:])])
         ec_out_raw_flat = np.reshape(ec_out_raw, [ec_out_raw.shape[0], np.prod(ec_out_raw.shape[1:])])
 
-        # print('vc stats', np.min(vc_input_flat), np.max(vc_input_flat))
-        # print('pm_raw stats (before)', np.min(ec_out_raw_flat), np.max(ec_out_raw_flat))
         ec_out_raw_flat = np.clip(ec_out_raw_flat, a_min=np.min(vc_input_flat), a_max=np.max(vc_input_flat))
-        # print('pm_raw stats (after)', np.min(ec_out_raw_flat), np.max(ec_out_raw_flat))
 
         pm_raw_mse = np.square(vc_input_flat - ec_out_raw_flat).mean()
-
         pm_raw_mhd = mod_hausdorff_distance(vc_input_flat, ec_out_raw_flat)
 
         losses['acc_mse_pm_raw'] = pm_raw_mse
@@ -1329,7 +1329,9 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
       pc = self._component.get_pc().get_decoding()
       _, pc_shape = self._component.get_signal('pc')
+
       self._summary_images['pc_encoding'] = ('pc', pc, pc_shape)
+      self._summary_images['pc_training'] = ('pc', self._training_features['pc'], pc_shape)
 
       if with_comparison_images:
         create_and_add_comparison_image(self._summary_images, batch_size, name='pc_in_mse',
@@ -1375,9 +1377,17 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     ]
 
     if self._hparams.pc_type != 'hl':
-      images_names.remove('pc_in_training')
-      images_names.remove('pc_in_encoding')
-      images_names.remove('pc_encoding')
+      images_names = [
+          'vc_input_training',
+          'pc_training',
+          'vc_input_encoding',
+          'pc_encoding',
+          'pc_at_vc'      # available when not using interest filter
+      ]
+
+      # images_names.remove('pc_in_training')
+      # images_names.remove('pc_in_encoding')
+      # images_names.remove('pc_encoding')
 
     if self._hparams.use_pm:
       images_names += ['ec_out_raw']
