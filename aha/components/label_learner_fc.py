@@ -67,6 +67,9 @@ class LabelLearnerFC(SummaryComponent):
     self._hparams = hparams
 
     with tf.variable_scope(self.name):
+
+      # Setup placeholders
+      # ------------------------------------
       self._batch_type = tf.placeholder_with_default(input='training', shape=[], name='batch_type')
 
       # 0) nn params
@@ -76,13 +79,15 @@ class LabelLearnerFC(SummaryComponent):
 
       # 1) organise inputs to network
       # ------------------------------------
-      self._dual.set_op('target_output', target_output)
-      t_nn_shape = target_output.get_shape().as_list()
-      t_nn_size = np.prod(t_nn_shape[1:])
 
+      # Switch inputs based on the batch type
       x_nn = tf.cond(tf.equal(self._batch_type, 'training'),
                      lambda: train_input,
                      lambda: test_input)
+
+      self._dual.set_op('target_output', target_output)
+      t_nn_shape = target_output.get_shape().as_list()
+      t_nn_size = np.prod(t_nn_shape[1:])
 
       x_nn = tf.layers.flatten(x_nn)
 
@@ -153,7 +158,13 @@ class LabelLearnerFC(SummaryComponent):
       preds = self._dual.get_op('preds')
       labels = self._dual.get_op('target_output')
 
-      unseen_idxs = (0, 1)
+      unseen_sum = 1
+      unseen_idxs = (0, unseen_sum)
+
+      # if name == 'll_vc':
+        # labels = tf.Print(labels, [tf.argmax(labels, 1)], 'labels=', summarize=20)
+        # preds = tf.Print(preds, [tf.argmax(preds, 1)], 'preds=', summarize=20)
+
 
       correct_predictions = tf.equal(tf.argmax(preds, 1), tf.argmax(labels, 1))
       correct_predictions = tf.cast(correct_predictions, tf.float32)
@@ -171,7 +182,7 @@ class LabelLearnerFC(SummaryComponent):
       if self._hparams.l2_regularizer > 0.0:
         all_losses = [loss]
 
-        for weight in weights:
+        for i, weight in enumerate(weights):
           weight_loss = tf.nn.l2_loss(weight)
           weight_loss_sum = tf.reduce_sum(weight_loss)
           weight_loss_scaled = weight_loss_sum * self._hparams.l2_regularizer
@@ -226,7 +237,7 @@ class LabelLearnerFC(SummaryComponent):
 
   def add_fetches(self, fetches, batch_type='training'):
     """Adds ops that will get evaluated."""
-    names = ['loss', 'accuracy', 'accuracy_unseen']
+    names = ['loss', 'preds', 'accuracy', 'accuracy_unseen']
 
     if batch_type == 'training':
       names.extend(['training_ll'])

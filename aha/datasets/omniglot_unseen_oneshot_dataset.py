@@ -114,7 +114,9 @@ class OmniglotUnseenOneShotDataset(OmniglotUnseenDataset):
     data_match = []
     data_match_idx = []
 
-    unseen_idx = 0
+    unseen_num = 1
+    unseen_idxs = list(range(unseen_num))
+    unseen_reuse = False
 
     end_batches = False
     batch_num = -1
@@ -130,33 +132,38 @@ class OmniglotUnseenOneShotDataset(OmniglotUnseenDataset):
       batch_label_index = -1
       batch_label = ''
 
+      unseen_label = None
+
       for i, sample in enumerate(range(self._batch_size)):
         show_files, show_labels = train_files, train_labels
         match_files, match_labels = test_files, test_labels
 
         # first element is unseen
-        if i == unseen_idx:
+        if i in unseen_idxs:
           show_files, show_labels = unseen_files, unseen_labels
           match_files, match_labels = show_files, show_labels
 
         # select first sample that is not in batch so far (to get unique)
-        index = -1
-        for idx, label in enumerate(show_labels):
-          if label not in batch_labels:
-            index = idx
-            break
+        if unseen_label is not None and i in unseen_idxs and len(unseen_idxs) > 1:
+          index = show_labels.index(unseen_label)
+        else:
+          index = -1
+          for idx, label in enumerate(show_labels):
+            if label not in batch_labels:
+              index = idx
+              break
 
-        # detect reaching the end of the dataset i.e. not able to assemble a new batch
-        if index == -1:
-          logging.info('Not able to find a unique class to assemble a new batch, '
-                       'on batch=%s, sample=%s', batch_num, sample)
-          end_batches = True
-          break
+          # detect reaching the end of the dataset i.e. not able to assemble a new batch
+          if index == -1:
+            logging.info('Not able to find a unique class to assemble a new batch, '
+                         'on batch=%s, sample=%s', batch_num, sample)
+            end_batches = True
+            break
 
         show_files_ = show_files.copy()
         show_labels_ = show_labels.copy()
 
-        if i == unseen_idx:
+        if i in unseen_idxs:
           match_files_ = show_files_
           match_labels_ = show_labels_
         else:
@@ -182,6 +189,9 @@ class OmniglotUnseenOneShotDataset(OmniglotUnseenDataset):
 
         assert show_label == match_label
 
+        if i == 0 and unseen_reuse:
+          unseen_label = show_label
+
         # Add samples to the dataset
         data_show.append([show_file, show_label])
         data_show_idx.append(show_index)
@@ -202,11 +212,20 @@ class OmniglotUnseenOneShotDataset(OmniglotUnseenDataset):
     self._dataset_show_files, self._dataset_show_labels = map(list, zip(*data_show))
     self._dataset_match_files, self._dataset_match_labels = map(list, zip(*data_match))
 
-    print('show_labels', self._dataset_show_labels, len(self._dataset_show_labels), '\n')
-    print('show_idx', data_show_idx, len(data_show_idx), '\n')
+    # start = 300
+    # end = 400
 
-    print('match_labels', self._dataset_match_labels, len(self._dataset_match_labels), '\n')
-    print('match_idx', data_match_idx, len(data_match_idx), '\n')
+    # self._dataset_show_files = self._dataset_show_files[start:end]
+    # self._dataset_show_labels = self._dataset_show_labels[start:end]
+
+    # self._dataset_match_files = self._dataset_match_files[start:end]
+    # self._dataset_match_labels = self._dataset_match_labels[start:end]
+
+    # print('show_labels', self._dataset_show_labels, len(self._dataset_show_labels), '\n')
+    # print('show_idx', data_show_idx, len(data_show_idx), '\n')
+
+    # print('match_labels', self._dataset_match_labels, len(self._dataset_match_labels), '\n')
+    # print('match_idx', data_match_idx, len(data_match_idx), '\n')
 
   def get_classes_by_superclass(self, superclasses, proportion=1.0):
     """

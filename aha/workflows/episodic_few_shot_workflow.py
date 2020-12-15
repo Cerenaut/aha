@@ -19,10 +19,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import logging
+import random
 
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 from pagi.components.summarize_levels import SummarizeLevels
 from pagi.utils import logger_utils, tf_utils, image_utils, data_utils
@@ -33,6 +36,7 @@ from aha.components.episodic_component import EpisodicComponent
 
 from aha.datasets.omniglot_lake_dataset import OmniglotLakeDataset
 from aha.datasets.omniglot_lake_runs_dataset import OmniglotLakeRunsDataset
+from aha.datasets.omniglot_lakelike_runs_dataset import OmniglotLakelikeRunsDataset
 from aha.datasets.omniglot_unseen_oneshot_dataset import OmniglotUnseenOneShotDataset
 
 from aha.workflows.episodic_workflow import EpisodicWorkflow
@@ -75,6 +79,10 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     """Builds an HParam object with default workflow options."""
     return tf.contrib.training.HParams(
         num_repeats=1,
+        num_replays=1,
+        consolidation_steps=0,
+        random_recall=None,
+        replay_buffer_threshold=0.0,
         superclass=False,
         class_proportion=1.0,
         invert_images=False,
@@ -141,6 +149,26 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
     self._add_comparison_images = False   # add the comparison images to the completion_summary if it is used
     self._paper = False                    # figures rendered for the paper
+
+    self._replay_inputs = []
+    self._replay_labels = []
+    self._replay_step = 0
+    self._consolidation_step = 0
+
+    self._replay_inh = None
+    self._big_loop = False
+
+    self._all_replay_inputs = []
+    self._all_replay_patterns = []
+    self._all_replay_labels = []
+
+    self._load_next_checkpoint = 0
+    self._run_ended = True
+
+    self._unseen_label = None
+    self._unseen_inputs = []
+    self._unseen_labels = []
+
 
   def _test_consistency(self):
     super()._test_consistency()
@@ -227,6 +255,11 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     if self._is_decoding_pc_at_vc():
       additional_decode += 1
 
+    test_recurse_iterations = self._opts['recurse_iterations']
+
+    if self._replay_mode():
+      test_recurse_iterations += self._opts['num_replays'] * self._opts['recurse_iterations']
+
     train_dataset, test_dataset = self._gen_datasets_with_options(self._opts['train_classes'],
                                                                   self._opts['test_classes'],
                                                                   is_superclass=self._opts['superclass'],
@@ -241,7 +274,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
                                                                   recurse_train=self._is_train_recursive(),
                                                                   recurse_test=self._is_inference_recursive(),
                                                                   num_batch_repeats=self._opts['num_repeats'],
-                                                                  recurse_iterations=self._opts['recurse_iterations'],
+                                                                  recurse_iterations=test_recurse_iterations,
                                                                   additional_test_decodes=additional_decode,
                                                                   evaluate_step=self._opts['evaluate'],
                                                                   use_trainset_for_tests=same_train_and_test,
@@ -259,6 +292,10 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
       elif self._dataset_type.__name__ == OmniglotLakeRunsDataset.__name__:
         self._dataset = self._dataset_type(self._dataset_location,
                                            self._hparams.batch_size)
+      elif self._dataset_type.__name__ == OmniglotLakelikeRunsDataset.__name__:
+        self._dataset = self._dataset_type(self._dataset_location,
+                                           self._hparams.batch_size,
+                                           self._opts['evaluate_mode'])
       elif self._dataset_type.__name__ == OmniglotUnseenOneShotDataset.__name__:
         self._dataset = self._dataset_type(self._dataset_location,
                                            self._hparams.batch_size)
@@ -277,8 +314,172 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
       mode = 'inference'
     return mode
 
+  def _setup_checkpoint_saver(self):
+    """Handles the saving and restoration of graph state and variables."""
+    max_to_keep = self._export_opts['max_to_keep']
+
+    def load_checkpoint(checkpoint_path):
+      # Loads a subset of the checkpoint, specified by variable scopes
+      if self._checkpoint_opts['checkpoint_load_scope']:
+        load_scope = []
+        init_scope = []
+
+        scope_list = self._checkpoint_opts['checkpoint_load_scope'].split(',')
+        for i, scope in enumerate(scope_list):
+          scope_list[i] = scope.lstrip().rstrip()
+
+        global_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+
+        for variable in global_variables:
+          # Add any variables that match the specified scope to a separate list
+          # Note: global_step is excluded and re-initialised, even if within scope
+          if variable.name.startswith(tuple(scope_list)) and 'global_step' not in variable.name:
+            load_scope.append(variable)
+          else:
+            init_scope.append(variable)
+
+        # Load variables from specified scope
+        saver = tf.train.Saver(load_scope)
+        self._restore_checkpoint(saver, checkpoint_path)
+
+        # Re-initialise any variables outside specified scope, including global_step
+        init_scope_op = tf.variables_initializer(init_scope, name='init')
+        self._session.run(init_scope_op)
+
+        # Switch to encoding mode if freezing loaded scope
+        if self._checkpoint_opts['checkpoint_frozen_scope']:
+          self._freeze_training = True
+
+        # Create new tf.Saver to save new checkpoints
+        self._saver = tf.train.Saver(max_to_keep=max_to_keep)
+        self._last_step = 0
+
+      # Otherwise, attempt to load the entire checkpoint
+      else:
+        self._saver = tf.train.Saver(max_to_keep=max_to_keep)
+        self._last_step = self._restore_checkpoint(self._saver, checkpoint_path)
+
+    if not self._replay_mode():
+      if 'model.ckpt' in self._checkpoint_opts['checkpoint_path']:
+        return super()._setup_checkpoint_saver()
+
+      # First call to this function by setup()
+      if self._load_next_checkpoint == 0:
+        self._saver = tf.train.Saver(max_to_keep=max_to_keep)
+        self._last_step = 0
+        return
+
+      folder_name = 'run' + str(self._load_next_checkpoint).zfill(2)
+      checkpoint_dir = os.path.join(self._checkpoint_opts['checkpoint_path'], folder_name)
+      checkpoint_path = tf.train.latest_checkpoint(checkpoint_dir)
+      print('Checkpoint Path =', checkpoint_path)
+
+      load_checkpoint(checkpoint_path)
+      return
+
+    # First call to this function by setup()
+    if self._load_next_checkpoint == 0:
+      self._saver = tf.train.Saver(max_to_keep=max_to_keep)
+      self._last_step = 0
+      return
+
+    filename = 'model.ckpt-' + str(self._load_next_checkpoint)
+    checkpoint_path = os.path.join(self._checkpoint_opts['checkpoint_path'], filename)
+    print('Checkpoint Path =', checkpoint_path)
+
+    load_checkpoint(checkpoint_path)
+
+
   def run(self, num_batches, evaluate, train=True):
-    super().run(num_batches=num_batches, evaluate=evaluate, train=train)
+    """Run Experiment"""
+
+    # Training
+    # -------------------------------------------------------------------------
+    training_handle = self._session.run(self._dataset_iterators['training'].string_handle())
+    self._session.run(self._dataset_iterators['training'].initializer)
+
+    if evaluate:
+      test_handle = self._session.run(self._dataset_iterators['test'].string_handle())
+      self._session.run(self._dataset_iterators['test'].initializer)
+
+    self._on_before_training_batches()
+
+    # set some hyperparams to instance variables for access in train and complete methods
+    # (to be compatible with base class method signatures)
+    self._rsummary_from_batch = num_batches - self._opts['rsummary_batches']  # recursive sums for last n batches
+
+    self._input_mode = self._opts['input_mode']
+
+    for batch in range(num_batches):
+      if self._replay_mode() and self._run_ended:
+        self._load_next_checkpoint += 40
+        self._setup_checkpoint_saver()
+        self._run_ended = False
+
+      if 'oneshot' in self._opts['evaluate_mode'] and batch % self._opts['num_repeats'] == 0:
+        self._load_next_checkpoint += 1
+        self._setup_checkpoint_saver()
+
+      logging.debug("----------------- Batch: %s", str(batch))
+      feed_dict = {}
+
+      if train:
+        global_step = tf.train.get_global_step(self._session.graph)
+        if global_step is not None:
+          training_step = self._session.run(global_step)
+          training_epoch = self._dataset.get_training_epoch(self._hparams.batch_size, training_step)
+        else:
+          training_step = 0
+          training_epoch = 0
+
+        # Perform the training, and retrieve feed_dict for evaluation phase
+        logging.debug("\t----------------- Train with training_step: %s", str(training_step))
+        feed_dict, _ = self.training(training_handle, batch)
+
+        self._on_after_training_batch(batch, training_step, training_epoch)
+
+        # Export any experiment-related data
+        # -------------------------------------------------------------------------
+        if self._export_opts['export_filters']:
+          if (batch == num_batches - 1) or ((batch + 1) % self._export_opts['interval_batches'] == 0):
+            self.export(self._session, feed_dict)
+
+        if self._export_opts['export_checkpoint']:
+          if (batch == num_batches - 1) or ((batch + 1) % self._export_opts['interval_batches'] == 0):
+            self._saver.save(self._session, os.path.join(self._summary_dir, 'model.ckpt'), global_step=batch + 1)
+
+      if evaluate:
+        logging.debug("----------------- Complete with training_step: %s", str(batch))
+        losses = self._complete_pattern(feed_dict, training_handle, test_handle, batch)
+
+        self._on_after_evaluate(losses, batch)
+
+      finished_recall = False
+      if self._build_replay_dataset():
+        if (self._replay_step + 1) % self._opts['num_replays'] == 0:
+          print('Finish Recall, starting consolidation...\n')
+          self._consolidation_step = 0
+          self._unseen_inputs = []
+          self._unseen_labels = []
+          finished_recall = True
+
+        self._replay_step += 1
+
+      if not finished_recall and self._consolidation_mode():
+        if (self._consolidation_step + 1) % self._opts['consolidation_steps'] == 0:
+          print('Finished consolidation, starting next run...\n')
+
+          self._replay_step = 0
+
+          self._big_loop = False
+          self._run_ended = True
+
+          self._replay_inputs = []
+          self._replay_labels = []
+          self._all_replay_inputs = []
+          self._all_replay_labels = []
+
+        self._consolidation_step += 1
 
     # this is here because we want it to execute at the very end of all batches (training or evaluation)
     if len(self._total_losses.keys()) > 0:
@@ -299,11 +500,110 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         print("{}, ".format(av), end='')
       print('\n')
 
+  def _replay_mode(self):
+    return 'replay' in self._opts['evaluate_mode']
+
+  def _replay_preprocess(self, inputs, labels):
+    if not isinstance(inputs, np.ndarray):
+      inputs = np.array(inputs)
+      labels = np.array(labels)
+      inputs = (inputs - np.min(inputs)) / (np.max(inputs) - np.min(inputs))
+    return inputs, labels
+
+  def _build_replay_dataset(self):
+    return self._replay_mode() and self._replay_step in list(range(self._opts['num_replays']))
+
+  def _consolidation_mode(self):
+    return self._replay_mode() and not self._build_replay_dataset()
+
+  def _random_sample(self, inputs, labels, batch_size):
+    """Random sample with duplicates."""
+    batch_inputs = []
+    batch_labels = []
+
+    size = len(inputs)
+
+    for i in range(batch_size):
+      idx = np.random.choice(np.arange(size), 1, replace=False)[0]
+      batch_inputs.append(inputs[idx])
+      batch_labels.append(labels[idx])
+
+    return np.array(batch_inputs), np.array(batch_labels)
+
+  def _setup_train_feed_dict(self, batch_type, training_handle):
+    feed_dict = super()._setup_train_feed_dict(batch_type, training_handle)
+
+    if self._consolidation_mode():
+      print('\n')
+      print('Consolidation Step -', self._consolidation_step)
+
+      if self._all_replay_inputs:
+        assert len(self._all_replay_inputs) == len(self._all_replay_labels)
+
+        random_sample = True
+        force_unseen = True
+
+        if random_sample:
+          replay_inputs, replay_labels = self._replay_preprocess(self._all_replay_inputs, self._all_replay_labels)
+
+          batch_inputs, batch_labels = self._random_sample(replay_inputs, replay_labels, self._hparams.batch_size)
+        else:
+          batch_inputs = np.array(self._all_replay_inputs)
+          batch_labels = np.array(self._all_replay_labels)
+
+        if force_unseen:
+          # Get unseen samples in the buffer
+          if not self._unseen_inputs:
+            for idx, soft_labels in enumerate(replay_labels):
+              hard_label = np.argmax(soft_labels)
+
+              if hard_label == self._unseen_label:
+                self._unseen_inputs.append(replay_inputs[idx])
+                self._unseen_labels.append(replay_labels[idx])
+
+          # Only override if we've found unseen in the buffer
+          if len(self._unseen_inputs) >= 1:
+            unseen_input, unseen_label = self._random_sample(self._unseen_inputs, self._unseen_labels, 1)
+
+            # Override first index with unseen sample
+            batch_inputs[0] = unseen_input
+            batch_labels[0] = unseen_label
+
+            print('Unseen Label:', self._unseen_label)
+            print('Batch Labels:', np.argmax(batch_labels, axis=1))
+
+        feed_dict.update({
+            self._component.get_dual().get_pl('replay'): True,
+
+            self._component.get_dual().get_pl('replay_inputs'): batch_inputs,
+            self._component.get_dual().get_pl('replay_labels'): batch_labels
+        })
+      else:
+        print('Using groundtruth data for consolidation...')
+
+    return feed_dict
+
   def training(self, training_handle, training_step, training_fetches=None):
     """The training procedure within the batch loop"""
 
+    # If we're in replay mode, and this is the first step of the run, then build the replay dataset first
+    if self._build_replay_dataset():
+      print('\n')
+      print('Replay Step =', self._replay_step)
+      print('Number of samples =', len(self._all_replay_inputs))
+
+      fetched = {}
+      batch_type = self._setup_train_batch_types()
+      feed_dict = self._setup_train_feed_dict(batch_type, training_handle)
+
+      # Trigger the iterator since we're skipping a training step
+      training_fetches = ({'labels': self._labels})
+      self._session.run(training_fetches, feed_dict)
+
+      return feed_dict, fetched
+
     # re-initialise variables if we're starting a new run
-    if self._is_eval_batch(training_step-1):  # previous step was an 'evaluation' step
+    if self._is_eval_batch(training_step - 1) and not self._replay_mode():  # previous step was an 'evaluation' step
       self._reinitialize_networks()
 
     self._training_features = {}
@@ -346,10 +646,16 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
     # Don't bother recursions in Hopfield while we're learning the 'fc network' to map VC to PC
     # Note: we still need to do this 'evaluation' step
 
-    if self._is_eval_batch(test_step):
+    if self._is_eval_batch(test_step) or self._build_replay_dataset():
       self._opts['test_recurse'] = self._test_recurse_opts
     else:
       self._opts['test_recurse'] = False
+
+    if self._consolidation_mode():
+      testing_feed_dict.update({
+          self._component.get_dual().get_pl('replay'): False,
+          self._component.get_pc().get_dual().get_pl('random_recall'): ''
+      })
 
     # 2) Run AMTL on test set (when enabled, will get PC completion of input image)
     # --------------------------------------------------------------
@@ -361,11 +667,236 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         }
     )
 
+    threshold = self._opts['replay_buffer_threshold']
+    use_threshold = threshold > 0
+    random_recall = self._opts['random_recall']
+
+    big_loop = self._big_loop
+    big_loop_done = False
+
+    if self._build_replay_dataset():
+      vc_encoding, _ = self._component.get_signal('vc')
+      vc_encoding_shape = vc_encoding.get_shape().as_list()
+      pr_noise_shape = self._component.get_pc().get_dual().get_pl('pr_noise').get_shape().as_list()
+      pc_noise_shape = self._component.get_pc().get_dual().get_pl('pc_noise').get_shape().as_list()
+
+      pc_random_noise = np.random.uniform(-1, 1, pc_noise_shape)
+      pr_random_noise = np.random.uniform(-1, 1, pr_noise_shape)
+
+      if big_loop and self._replay_inputs:
+        print('Replay Mode =', 'Big-Loop Recurrence')
+
+        self._replay_inputs = np.array(self._replay_inputs)
+        self._replay_labels = np.array(self._replay_labels)
+
+        batch_inputs, batch_labels = self._replay_preprocess(self._replay_inputs, self._replay_labels)
+
+        testing_feed_dict.update({
+            self._component.get_dual().get_pl('replay'): True,
+            self._component.get_pc().get_dual().get_pl('use_inhibition'): False,
+            self._component.get_pc().get_dual().get_pl('random_recall'): '',
+            self._component.get_pc().get_dual().get_pl('pc_noise'): pc_random_noise,
+            self._component.get_pc().get_dual().get_pl('pr_noise'): pr_random_noise,
+            self._component.get_dual().get_pl('replay_inputs'): batch_inputs,
+            self._component.get_dual().get_pl('replay_labels'): batch_labels
+        })
+
+        big_loop_done = True
+        self._big_loop = False
+
+      elif random_recall:
+        print('Replay Mode =', 'Random Recall', 'using', random_recall)
+
+        testing_feed_dict.update({
+            self._component.get_pc().get_dual().get_pl('random_recall'): random_recall,
+            self._component.get_pc().get_dual().get_pl('use_inhibition'): False,
+            self._component.get_pc().get_dual().get_pl('pc_noise'): pc_random_noise,
+            self._component.get_pc().get_dual().get_pl('pr_noise'): pr_random_noise,
+            self._component.get_pc().get_dual().get_pl('inhibition'): np.zeros(vc_encoding_shape)
+        })
+
+        self._big_loop = True
+
+      self._replay_inputs = []
+      self._replay_labels = []
+
     logging.debug("**********>> Testing: Batch={}".format(test_step))
     testing_fetched = self._inference(test_step, testing_feed_dict, testing_fetches)
 
     self._testing_features = self._extract_features(testing_fetched)
     self._test_inputs = testing_fetched['test_inputs']
+
+    if self._build_replay_dataset():
+      self._unseen_label = testing_fetched['labels'][0]
+
+      filtered_replay_inputs = []
+      filtered_replay_labels = []
+      filtered_replay_patterns = []
+
+      replay_inputs = np.reshape(testing_fetched['pc']['ec_out_raw'], self._dataset.shape)
+      replay_images = replay_inputs
+
+      replay_labels = testing_fetched['ll_pc']['preds']
+      replay_patterns = testing_fetched['pc']['y']
+
+      for i, (image, label) in enumerate(zip(replay_inputs, replay_labels)):
+        append = False
+
+        if use_threshold and np.sum(image) > threshold:
+          # If not in big loop, always append
+          if not big_loop:
+            append = False
+
+          # If in big loop, only append when big loop is done
+          elif big_loop and big_loop_done:
+            # append = False
+            append = True
+
+            # # Only append labels that match groundtruth
+            # if np.argmax(replay_labels[i]) in testing_fetched['labels']:
+            #   append = True
+
+            # # n = 5
+            # # top_n = replay_labels[i].argsort()[-n:][::-1]
+            # # print(i, top_n, replay_labels[i][top_n])
+
+            # # Avoid duplicate images
+            # if append and self._all_replay_labels:
+            #   append = False
+
+            #   # for bfr_img, bfr_label in zip(self._all_replay_inputs, self._all_replay_labels):
+            #   #   print(bfr_image.shape, np.squeeze(bfr_img).shape)
+
+            #   #   (score, diff) = compare_ssim(np.squeeze(bfr_img), np.squeeze(image), full=True)
+            #   #   print('BFR Label =', bfr_label, 'Current label =', label)
+            #   #   print('SSIM =', score, diff)
+
+            #   # The second condition makes it easier to track; but requires knowledge of training labels
+            #   if np.argmax(replay_labels[i]) not in np.argmax(np.array(self._all_replay_labels), axis=1)[:]:
+            #     append = True
+
+            # Limit buffer to batch_size length
+            # Note: Maybe we don't need to limit this.
+            # if len(self._replay_labels) >= self._hparams.batch_size:
+            #   append = False
+
+        elif not use_threshold:
+          append = True
+
+        if append:
+          filtered_replay_inputs.append(replay_inputs[i])
+          self._all_replay_inputs.append(replay_inputs[i])
+
+          filtered_replay_patterns.append(replay_patterns[i])
+          self._all_replay_patterns.append(replay_patterns[i])
+
+          filtered_replay_labels.append(replay_labels[i])
+          self._all_replay_labels.append(replay_labels[i])
+
+        self._replay_inputs.append(replay_inputs[i])
+        self._replay_labels.append(replay_labels[i])
+
+      # interval = self._opts['num_replays']
+      interval = 1
+
+      if self._all_replay_labels:
+        labels_retrieved = np.argmax(self._all_replay_labels, axis=1)
+        labels_missing = np.setdiff1d(testing_fetched['labels'], labels_retrieved)
+        labels_unique = np.unique(labels_retrieved)
+
+      _, pc_input_shape = self._component.get_signal('pc_input')
+
+      if (self._replay_step + 1) % interval == 0 and self._all_replay_labels:
+
+        print('Labels retrieved ({0}) = {1}'.format(len(labels_retrieved), labels_retrieved))
+        print('Labels missing ({0}) = {1}'.format(len(labels_missing), labels_missing))
+        print('Groundtruth =', testing_fetched['labels'])
+        print('Unique =', labels_unique)
+
+        plt.switch_backend('agg')
+
+        rows = 7
+        cols = self._hparams.batch_size
+        _, ax = plt.subplots(nrows=rows, ncols=cols, figsize=[10, 2], num=test_step)
+        plt.subplots_adjust(left=0, right=1.0, bottom=0, top=1.0, hspace=0.1, wspace=0.1)
+
+        # plot simple raster image on each sub-plot
+        for i, ax in enumerate(ax.flat):
+          # get indices of row/column
+          row_idx = i // cols
+          col_idx = i % cols
+
+          img_idx = col_idx
+
+          if row_idx in [1, 3]:
+            label_idx = testing_fetched['labels'][img_idx]
+            label_real = self._dataset.eval_classes[label_idx]
+            ax.text(0.3, 0.3, str(label_real))
+          elif row_idx == 5:
+            label_idx = np.argmax(replay_labels[img_idx])
+            label_real = self._dataset.eval_classes[label_idx]
+            ax.text(0.3, 0.3, str(label_real))
+          else:
+            if row_idx == 0:
+              img = target_inputs[img_idx]
+            elif row_idx == 2:
+              img = self._test_inputs[img_idx]
+            elif row_idx == 4:
+              img = replay_images[img_idx]
+            elif row_idx == 6:
+              img = replay_patterns[img_idx]
+
+            if row_idx in [0, 2, 4]:
+              image_shape = [replay_images.shape[1], replay_images.shape[2]]
+              img = np.reshape(img, image_shape)
+              ax.imshow(img, cmap='binary', vmin=0, vmax=1)
+            else:
+              img = np.reshape(img, [pc_input_shape[1], pc_input_shape[2]])
+              ax.imshow(img, vmin=-1, vmax=1)
+
+          ax.axis('off')
+
+        filetype = 'png'
+        filename = 'batch_replay_summary_' + str(test_step) + '.' + filetype
+        filepath = os.path.join(self._summary_dir, filename)
+        plt.savefig(filepath, bbox_inches='tight', pad_inches=0.2, dpi=300, format=filetype)
+        plt.clf()
+
+        rows = 3
+        cols = len(filtered_replay_inputs)
+        _, ax = plt.subplots(nrows=rows, ncols=cols, figsize=[10, 2], num=test_step)
+        plt.subplots_adjust(left=0, right=1.0, bottom=0, top=1.0, hspace=0.1, wspace=0.1)
+
+        # plot simple raster image on each sub-plot
+        for i, ax in enumerate(ax.flat):
+          # get indices of row/column
+          row_idx = i // cols
+          col_idx = i % cols
+
+          img_idx = col_idx
+
+          if row_idx == 1:
+            label_idx = np.argmax(filtered_replay_labels[img_idx])
+            label_real = self._dataset.eval_classes[label_idx]
+            ax.text(0.3, 0.3, str(label_real), fontsize=9)
+          elif row_idx == 0:
+            img = filtered_replay_inputs[img_idx]
+
+            image_shape = [replay_images.shape[1], replay_images.shape[2]]
+            img = np.reshape(img, image_shape)
+            ax.imshow(img, cmap='binary', vmin=0, vmax=1)
+          elif row_idx == 2:
+            img = filtered_replay_patterns[img_idx]
+
+            img = np.reshape(img, [pc_input_shape[1], pc_input_shape[2]])
+            ax.imshow(img, vmin=-1, vmax=1)
+
+          ax.axis('off')
+
+        filetype = 'png'
+        filename = 'filtered_replay_summary_' + str(test_step) + '.' + filetype
+        filepath = os.path.join(self._summary_dir, filename)
+        plt.savefig(filepath, bbox_inches='tight', pad_inches=0.2, dpi=300, format=filetype)
 
     logging.debug("          --------> Batch={},  Testing labels = {}".format(test_step, self._testing_features['labels'][0]))
 
@@ -486,6 +1017,13 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
         self._report_average_metric('ll_pc_accuracy', losses['ll_pc_accuracy'])
         self._report_average_metric('ll_pc_accuracy_unseen', losses['ll_pc_accuracy_unseen'])
 
+      if self._component.is_build_ll_ensemble():
+        losses['ll_ensemble_accuracy'] = self._component.get_values('ensemble_accuracy')
+        losses['ll_ensemble_accuracy_unseen'] = self._component.get_values('ensemble_accuracy_unseen')
+
+        self._report_average_metric('ll_ensemble_accuracy', losses['ll_ensemble_accuracy'])
+        self._report_average_metric('ll_ensemble_accuracy_unseen', losses['ll_ensemble_accuracy_unseen'])
+
       if self._component.get_pc().use_pm_raw is True:
         vc_input = target_inputs
         ec_out_raw = self._component.get_pc().get_ec_out_raw()
@@ -511,6 +1049,23 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
       if pc_at_vc is not None:
         losses['loss_pc_at_vc'] = np.square(self._test_inputs - pc_at_vc).mean()
+
+    if self._consolidation_mode() and  self._all_replay_inputs:
+      labels_retrieved = np.argmax(self._all_replay_labels, axis=1)
+      labels_missing = np.setdiff1d(testing_fetched['labels'], labels_retrieved)
+      labels_unique = np.unique(labels_retrieved)
+
+      losses['recalled_unseen'] = int(testing_fetched['labels'][0] in labels_retrieved)
+      losses['recalled_batch'] = int(len(labels_missing) == 0)  # pylint: disable=len-as-condition
+      losses['num_unique_recalled'] = len(labels_unique)
+      losses['num_samples_recalled'] = len(labels_retrieved)
+      losses['num_samples_missing'] = len(labels_missing)
+
+      self._report_average_metric('recalled_unseen', losses['recalled_unseen'])
+      self._report_average_metric('recalled_batch', losses['recalled_batch'])
+      self._report_average_metric('num_unique_recalled', losses['num_unique_recalled'])
+      self._report_average_metric('num_samples_recalled', losses['num_samples_recalled'])
+      self._report_average_metric('num_samples_missing', losses['num_samples_missing'])
 
     return losses
 

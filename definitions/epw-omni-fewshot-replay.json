@@ -1,16 +1,16 @@
 {
   "experiment-options": {
     "workflow": "aha.workflows.episodic_few_shot_workflow",
-    "dataset": "aha.datasets.omniglot_lakelike_runs_dataset",
+    "dataset": "aha.datasets.omniglot_unseen_oneshot_dataset",
     "component": "aha.components.episodic_component",
 
-    "checkpoint": "/home/incubator/agief-remote-run/aha/run/summaries_20200306-073128/model.ckpt-1000",
-    "checkpoint_load_scope": "episodic/vc, episodic/ll_vc",
-    "checkpoint_frozen_scope": "episodic/vc, episodic/ll_vc, episodic/dg",
+    "checkpoint": "/home/incubator/agief-remote-run/storage/checkpoints/episodic/summaries_20200303-125645",
+    "checkpoint_load_scope": "episodic/vc, episodic/pc, episodic/ll_pc, episodic/ll_vc",
+    "checkpoint_frozen_scope": "episodic/vc, episodic/dg, episodic/pc, episodic/ll_pc",
 
     "logging": "info",
     "seed": 42,
-    "batches": 40,
+    "batches": 8,
 
     "summarize": true,
     "track": true,
@@ -89,7 +89,7 @@
       "pc_hl_use_feedback": true,
       "pc_hl_memorise_method": "pinv",
       "pc_hl_nonlinearity": "tanh",
-      "pc_hl_update_n_neurons": 20,
+      "pc_hl_update_n_neurons": 15,
       "pc_hl_gain": 2.7,
       "pc_hl_pr_type": "nn",
       "pc_hl_pm_type": "none",
@@ -133,7 +133,7 @@
       "ifi_summarize_level": 1,
       "ifi_max_outputs": 3,
 
-      "ll_vc_batch_size": 64,
+      "ll_vc_batch_size": 20,
       "ll_vc_hidden_size": 0,
       "ll_vc_learning_rate": 0.001,
       "ll_vc_l2_regularizer": 0.0,
@@ -153,12 +153,15 @@
     }
   },
   "export-options": {
-    "export_filters": false,
-    "interval_batches": 40,
-    "max_to_keep": 20
+    "export_filters": false
   },
   "workflow-options": {
-    "num_repeats": 40,
+    "num_repeats": 4,
+    "num_replays": 2,
+    "consolidation_steps": 2,
+    "random_recall": "pr",
+    "replay_buffer_threshold": 100.0,
+
     "evaluate": true,
     "invert_images": false,
     "resize_images_factor": 0.5,
@@ -184,13 +187,8 @@
     "rsummary_batches": 0,
     "visualise_vc": false,
     "visualise_if_at_vc": false,
-    "evaluate_mode": ["oneshot"],
+    "evaluate_mode": ["replay"],
     "evaluate_supermode": "none",
     "summarize_completion": "to_file"
-  },
-  "parameter-sweeps": {
-    "hparams": [],
-    "workflow-options": [],
-    "experiment-options": []
   }
 }

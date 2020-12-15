@@ -30,7 +30,7 @@ from pagi.utils.layer_utils import activation_fn, type_activation_fn
 from pagi.components.component import Component
 from pagi.components.summarize_levels import SummarizeLevels
 
-from aha.utils.generic_utils import build_kernel_initializer
+from aha.utils.generic_utils import build_kernel_initializer, normalize_minmax, print_minmax
 
 ########################################################################################
 
@@ -101,7 +101,7 @@ def get_pc_topk_shift(tensor, sparsity):
   y_masked_min = 1.0 - y_inv_masked_max
 
   # convert this to tanh range
-  # cue_tanh_min:  -0.5 -0.1 0.0  0.1  0.5 
+  # cue_tanh_min:  -0.5 -0.1 0.0  0.1  0.5
   # 0-x            +0.5 +0.1 0.0 -0.1 -0.5
   # so e.g.
   #             -0.5 + 0.5 = 0
@@ -277,6 +277,10 @@ class HopfieldlikeComponent(Component):
   @property
   def use_pm_raw(self):
     return self._use_pm_raw
+
+  @property
+  def use_inhibition(self):
+    return True
 
   def get_loss(self):
     """Loss from memorisation of samples in fb weights """
@@ -465,6 +469,10 @@ class HopfieldlikeComponent(Component):
       # ---------------------------------------------------
       self._setup_inputs()    # sets: x_cue, x_ext, x_fb
 
+      self._random_recall = self._dual.add('random_recall',
+                                           shape=[],
+                                           default_value='').add_pl(default=True, dtype=tf.string)
+
       # 1) build cue mapping for retrieval (if relevant)
       # ---------------------------------------------------
       if self._use_input_cue:
@@ -583,6 +591,13 @@ class HopfieldlikeComponent(Component):
       x_ext = self._dual.get_op('x_ext')
       x_direct = x_ext  # no weights, one-to-one mapping, so they are the same
 
+    pc_noise = self._dual.add('pc_noise',
+                              shape=x_direct.shape,
+                              default_value=0.0).add_pl(default=True, dtype=x_direct.dtype)
+
+    # Swap 'x_direct' during random recall at PC
+    x_direct = tf.cond(tf.equal(self._random_recall, 'pc'), lambda: pc_noise, lambda: x_direct)
+
     x_fb = self._dual.get_pl('x_fb')
     z = tf.matmul(x_fb, w) + x_direct  # weighted sum + bias
     y_potential, _ = activation_fn(self._hparams.gain * z, self._hparams.nonlinearity)  # non-linearity
@@ -590,11 +605,14 @@ class HopfieldlikeComponent(Component):
     # only update the relevant neurons
     y = self._neuron_update(input_size, x_fb, y_potential)
 
+    # calculate Hopfield Energy
+    e = -0.5 * tf.matmul(tf.matmul(y, w), tf.transpose(y)) - tf.matmul(y, tf.transpose(x_direct))
+
     # 'decoding' for output in same dimensions as input, and for consistency with other components
     y_reshaped = tf.reshape(y, input_values_shape)
 
-    # calculate Hopfield Energy
-    e = -0.5 * tf.matmul(tf.matmul(y, w), tf.transpose(y)) - tf.matmul(y, tf.transpose(x_direct))
+    # Normalize the decoding output
+    y_reshaped = normalize_minmax(y_reshaped)
 
     # remember values for later use
     self._dual.set_op('w', w)
@@ -608,12 +626,10 @@ class HopfieldlikeComponent(Component):
   def _build_pm(self):
     """Preprocess the inputs and build the pattern mapping components."""
 
-    def normalize(x):
-      return (x - tf.reduce_min(x)) / (tf.reduce_max(x) - tf.reduce_min(x))
-
     # map to input
-    pc_out = self._dual.get_op('y')  # output of Hopfield (PC)
-    pc_out = normalize(pc_out)
+    # pc_out = self._dual.get_op('y')  # output of Hopfield (PC)
+    pc_out = self._dual.get_op('decoding')  # output of Hopfield (PC)
+    # pc_out = normalize_minmax(pc_out)
 
     pc_target = self._dual.get_op('pr_target')
 
@@ -789,6 +805,33 @@ class HopfieldlikeComponent(Component):
     x_nn_shape = x_nn.get_shape().as_list()
     x_nn_size = np.prod(x_nn_shape[1:])
 
+    pr_noise = self._dual.add('pr_noise',
+                              shape=x_nn.shape,
+                              default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
+
+    inhibition = self._dual.add('inhibition',
+                                shape=x_nn.shape,
+                                default_value=0.0).add_pl(default=True, dtype=x_nn.dtype)
+
+    use_inhibition_pl = self._dual.add('use_inhibition',
+                                       shape=[],
+                                       default_value=False).add_pl(default=True, dtype=tf.bool)
+
+    if self.use_inhibition:
+      decay = 0.5
+      inhibition_decayed = decay * inhibition + (1 - decay) * x_nn
+      self._dual.set_op('inhibition', inhibition_decayed)
+
+      inhibition_noise = pr_noise + inhibition_decayed
+      random_cue = tf.cond(tf.equal(use_inhibition_pl, True), lambda: inhibition_noise, lambda: pr_noise)
+    else:
+      random_cue = pr_noise
+
+    # Swap 'x_nn' during random recall
+    x_nn = tf.cond(tf.equal(self._random_recall, 'pr'), lambda: random_cue, lambda: x_nn)
+
+    x_nn = x_nn
+
     # 2) build the network
     # ------------------------------------
 
@@ -903,6 +946,9 @@ class HopfieldlikeComponent(Component):
     else:
       self._build_optimizer(loss, 'training_pr', scope='pr')
 
+    # Swap 'y' during replay
+    # y = tf.cond(tf.equal(replay, True), lambda: replay_input, lambda: y)
+
     self._dual.set_op('pr_probs', y)    # badly named for historical reasons
 
     if (last_layer == 'sigmoid_ce') or (last_layer == 'sigmoid_mse') or (last_layer == 'lrelu_mse'):  # New modes
@@ -911,7 +957,7 @@ class HopfieldlikeComponent(Component):
       # Clip
       y = tf.clip_by_value(y, 0.0, 1.0)
 
-      # Sparsen 
+      # Sparsen
       if self._hparams.cue_nn_sparsen is True:
         k_pr = int(sparsity * pr_sparsity_boost)
         logging.info('PR Sparsen enabled k=' + str(k_pr))
@@ -1136,9 +1182,15 @@ class HopfieldlikeComponent(Component):
   # ---------------- training
 
   def update_training_dict(self, feed_dict):
+    names = []
+    if self.use_inhibition:
+      names.extend(['inhibition'])
+    self._dual.update_feed_dict(feed_dict, names)
+
     feed_dict.update({
         self._batch_type: 'training'
     })
+
 
   def add_training_fetches(self, fetches):
 
@@ -1159,6 +1211,9 @@ class HopfieldlikeComponent(Component):
 
     if self._use_pm_raw:
       names.extend(['training_pm_raw', 'ec_out_raw'])
+
+    if self.use_inhibition:
+      names.extend(['inhibition'])
 
     # this needs to be done once, because it replaces the fetches, instead of adding to them
     self._dual.add_fetches(fetches, names)
@@ -1181,13 +1236,21 @@ class HopfieldlikeComponent(Component):
     if self._use_pm_raw:
       names.extend(['ec_out_raw'])
 
+    if self.use_inhibition:
+      names.extend(['inhibition'])
 
     self._dual.set_fetches(fetched, names)
 
 # ---------------- inference (encoding)
 
   def update_encoding_dict(self, feed_dict):
+    names = []
+    if self.use_inhibition:
+      names.extend(['inhibition'])
+    self._dual.update_feed_dict(feed_dict, names)
+
     self._update_dict_fb(feed_dict)
+
     feed_dict.update({
         self._batch_type: 'encoding'
     })
@@ -1210,6 +1273,9 @@ class HopfieldlikeComponent(Component):
     if self._use_pm_raw:
       names.extend(['pm_loss_raw', 'ec_out_raw'])
 
+    if self.use_inhibition:
+      names.extend(['inhibition'])
+
     self._dual.add_fetches(fetches, names)
 
   def set_encoding_fetches(self, fetched):
@@ -1228,6 +1294,9 @@ class HopfieldlikeComponent(Component):
 
     if self._use_pm_raw:
       names.extend(['pm_loss_raw', 'ec_out_raw'])
+
+    if self.use_inhibition:
+      names.extend(['inhibition'])
 
     self._dual.set_fetches(fetched, names)
 
@@ -1281,8 +1350,10 @@ class HopfieldlikeComponent(Component):
       if self.use_pm:
         ec_in = self._input_cue
         ec_out = self._dual.get_op('ec_out')
-        ec_recon = image_utils.concat_images([ec_in, ec_out], self._hparams.batch_size, images_shape=ec_recon_shape)
+        ec_recon = image_utils.concat_images([ec_in, ec_out], self._hparams.batch_size)
         summaries.append(tf.summary.image('ec_recon', ec_recon, max_outputs=max_outputs))
+
+
 
         # visualise losses
         pm_loss = self._dual.get_op('pm_loss')
@@ -1401,7 +1472,8 @@ class HopfieldlikeComponent(Component):
     """Build summaries for retrieval."""
 
     # summarise_stuff = ['pm', 'pr', 'general']
-    summarise_stuff = ['pm']
+    # summarise_stuff = ['pm']
+    summarise_stuff = ['general']
 
     max_outputs = self._hparams.max_outputs
     summary_input_shape = image_utils.get_image_summary_shape(self._input_summary_shape)

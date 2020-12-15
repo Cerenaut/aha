@@ -20,6 +20,13 @@ Episodic-specific general utils.
 import numpy as np
 import tensorflow as tf
 
+def normalize_minmax(inputs):
+  return (inputs - tf.reduce_min(inputs)) / (tf.reduce_max(inputs) - tf.reduce_min(inputs))
+
+
+def print_minmax(tensor, name):
+  return tf.Print(tensor, data=[tf.reduce_min(tensor), tf.reduce_max(tensor), tf.reduce_sum(tensor)],
+                  message=str(name) + ' - min/max/sum = ')
 
 def build_kernel_initializer(init_type='he', uniform=False):
   if init_type == 'he':
