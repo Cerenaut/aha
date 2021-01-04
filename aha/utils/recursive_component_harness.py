@@ -102,8 +102,6 @@ class RecursiveComponentHarness(object):
       step = summary_batch * self._recurse_iterations + i
       logging.debug("\t\t-- Inference step: %s", str(step))
 
-      logging.debug('\t\t-- Inference step: ', str(step))
-
       self._manage_input(i, mode, input_mode, feed_dict_inference)
 
       fetches = self._pre(feed_dict_inference, inference_batch_type, fetches)
