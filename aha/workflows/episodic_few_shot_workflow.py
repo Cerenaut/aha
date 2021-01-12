@@ -412,7 +412,7 @@ class EpisodicFewShotWorkflow(EpisodicWorkflow, PatternCompletionWorkflow):
 
     for batch in range(num_batches):
       if self._replay_mode() and self._run_ended:
-        self._load_next_checkpoint += 40
+        self._load_next_checkpoint += 60
         self._setup_checkpoint_saver()
         self._run_ended = False
 
